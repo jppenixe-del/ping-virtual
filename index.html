@@ -251,7 +251,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <h2>Coefficients</h2>
     <div class="card tablewrap"><table class="grille" id="coefs"></table></div>
     <p class="note" style="margin-top:12px">Les coefficients peuvent changer d'une saison à l'autre : en cas de doute, choisis « Autre » et saisis le coefficient indiqué par la FFTT. Résultat officiel : seule la situation mensuelle FFTT fait foi.</p>
-    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-11</span></p>
+    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-12</span></p>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Les données restent sur ce téléphone. Exporte-les pour les garder ou les passer sur un autre appareil.</p>
@@ -678,10 +678,10 @@ async function carregaRang(){
   } else if (d.virtuel){
     $("rResumo").innerHTML = `<p class="hint">Top virtuel : les ${d.total} meilleurs Benjamins de Bretagne (par points mensuels), recalculés avec leurs matchs, chaque jour.</p>`;
   } else if (eu){
-    const v = virtJ(j), rv = 1 + d.joueurs.filter(x => x.lic !== j.licence && x.pts > v).length;
+    const v = virtJ(j);
     $("rResumo").innerHTML = `<div class="hero" style="padding:16px 18px"><div class="row"><div><div class="lbl">${esc(j.nom)} · ${esc($("rCat").selectedOptions[0].text)} · ${esc(zona)}</div>
       <div class="big num" style="font-size:54px">${eu.rang}<span style="font-size:26px">e</span> <span style="font-size:22px;font-style:normal;opacity:.85">/ ${d.total}</span></div></div></div>
-      <div class="bar-l" style="margin-top:6px"><span>avec ${fmt(eu.pts)} pts mensuels</span><span>avec ses virtuels (${fmt(Math.round(v*10)/10)}) : <b>${rv}e</b></span></div></div>`;
+      <div class="bar-l" style="margin-top:6px"><span>avec ${fmt(eu.pts)} pts mensuels</span><span>virtuels ${fmt(Math.round(v*10)/10)} → voir « Virtuels (top) »</span></div></div>`;
   } else if (j.licence) $("rResumo").innerHTML = `<p class="hint">${esc(j.nom)} n'est pas dans cette liste (autre catégorie, sexe ou zone).</p>`;
   const iEu = eu ? d.joueurs.indexOf(eu) : -1;
   const mostra = iEu > 300 ? d.joueurs.slice(0, 100).concat([null], d.joueurs.slice(iEu - 30, iEu + 31)) : d.joueurs.slice(0, 400);
