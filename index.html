@@ -75,7 +75,7 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px;lett
 .seg button{background:var(--surface2);border:1px solid var(--line);color:var(--ink);padding:11px}
 .seg button.on.w{background:var(--win);border-color:var(--win);color:#fff}
 .seg button.on.l{background:var(--loss);border-color:var(--loss);color:#fff}
-.seg button.on[data-sexe]{background:var(--table);border-color:var(--table);color:#fff}
+.seg button.on[data-sexe],.seg button.on[data-modo]{background:var(--table);border-color:var(--table);color:#fff}
 .preview{margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);font-size:14px}
 .preview b{font-family:"Barlow Condensed",sans-serif;font-size:26px}
 .pos{color:var(--win)} .neg{color:var(--loss)}
@@ -233,6 +233,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
           <option value="Minime">Minimes</option><option value="Cadet">Cadets</option><option value="Junior">Juniors</option><option value="Sénior">Séniors</option><option value="Vétéran">Vétérans</option><option value="">Toutes</option></select></div>
         <div class="field"><label for="rDep">Zone</label><select id="rDep"><option value="">Bretagne</option><option value="22">Côtes-d'Armor</option><option value="29">Finistère</option><option value="35">Ille-et-Vilaine</option><option value="56">Morbihan</option></select></div>
       </div>
+      <div class="field" style="margin-top:10px"><label>Points</label><div class="seg"><button type="button" class="on" data-modo="">Mensuels</button><button type="button" data-modo="virtuel">Virtuels (top)</button></div></div>
       <div class="field" style="margin-top:10px"><label>Sexe</label><div class="seg" style="grid-template-columns:repeat(3,1fr)"><button type="button" class="on" data-sexe="">Tous</button><button type="button" data-sexe="H">Garçons</button><button type="button" data-sexe="F">Filles</button></div></div>
     </div>
     <div id="rResumo" style="margin-top:12px"></div>
@@ -250,7 +251,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <h2>Coefficients</h2>
     <div class="card tablewrap"><table class="grille" id="coefs"></table></div>
     <p class="note" style="margin-top:12px">Les coefficients peuvent changer d'une saison à l'autre : en cas de doute, choisis « Autre » et saisis le coefficient indiqué par la FFTT. Résultat officiel : seule la situation mensuelle FFTT fait foi.</p>
-    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-10</span></p>
+    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-11</span></p>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Les données restent sur ce téléphone. Exporte-les pour les garder ou les passer sur un autre appareil.</p>
@@ -657,12 +658,12 @@ function infoPP(){
 $("ppSync").onclick = () => sync(J(), true);
 
 // ---------------- classement régional (backoffice: /api/classement)
-let rSexe = "", rUltimo = "";
+let rSexe = "", rUltimo = "", rModo = "";
 function virtJ(j){ let t = 0; compte(j).forEach(m => t += res(j, m).pts); return j.mens + t; }
 async function carregaRang(){
   const j = J();
   if (j.categorie && !rUltimo){ const c = j.categorie.replace(/ \d$/, ""); if ([...$("rCat").options].some(o => o.value === c)) $("rCat").value = c; }
-  const q = `cat=${encodeURIComponent($("rCat").value)}&dep=${$("rDep").value}&sexe=${rSexe}`; rUltimo = q;
+  const q = `cat=${encodeURIComponent($("rCat").value)}&dep=${$("rDep").value}&sexe=${rSexe}&mode=${rModo}`; rUltimo = q;
   $("rLista").innerHTML = `<div class="empty">Chargement…</div>`; $("rResumo").innerHTML = "";
   const d = await api(`/classement?${q}`);
   if (q !== rUltimo) return;
@@ -670,7 +671,13 @@ async function carregaRang(){
   const meus = new Set(D.joueurs.map(p => p.licence).filter(Boolean));
   const eu = d.joueurs.find(x => x.lic === j.licence);
   const zona = $("rDep").value ? $("rDep").selectedOptions[0].text : "Bretagne";
-  if (eu){
+  if (eu && d.virtuel){
+    $("rResumo").innerHTML = `<div class="hero" style="padding:16px 18px"><div class="row"><div><div class="lbl">${esc(j.nom)} · top virtuel · ${esc(zona)}</div>
+      <div class="big num" style="font-size:54px">${eu.rang}<span style="font-size:26px">e</span> <span style="font-size:22px;font-style:normal;opacity:.85">/ ${d.total}</span></div></div></div>
+      <div class="bar-l" style="margin-top:6px"><span>${fmt(Math.round(eu.virtuels*10)/10)} pts virtuels</span><span>calcul du ${dataFr(d.maj.slice(0,10))}</span></div></div>`;
+  } else if (d.virtuel){
+    $("rResumo").innerHTML = `<p class="hint">Top virtuel : les ${d.total} meilleurs Benjamins de Bretagne (par points mensuels), recalculés avec leurs matchs, chaque jour.</p>`;
+  } else if (eu){
     const v = virtJ(j), rv = 1 + d.joueurs.filter(x => x.lic !== j.licence && x.pts > v).length;
     $("rResumo").innerHTML = `<div class="hero" style="padding:16px 18px"><div class="row"><div><div class="lbl">${esc(j.nom)} · ${esc($("rCat").selectedOptions[0].text)} · ${esc(zona)}</div>
       <div class="big num" style="font-size:54px">${eu.rang}<span style="font-size:26px">e</span> <span style="font-size:22px;font-style:normal;opacity:.85">/ ${d.total}</span></div></div></div>
@@ -680,13 +687,14 @@ async function carregaRang(){
   const mostra = iEu > 300 ? d.joueurs.slice(0, 100).concat([null], d.joueurs.slice(iEu - 30, iEu + 31)) : d.joueurs.slice(0, 400);
   const linhas = mostra.map(x => x === null ? `<div class="empty" style="padding:8px">⋯</div>` : `<div class="match" ${x.lic === j.licence ? 'id="rEu" style="background:color-mix(in srgb,var(--ball) 16%,transparent)"' : ""}>
       <div class="res num" style="background:var(--surface2);color:var(--ink);font-size:${x.rang > 99 ? 13 : 16}px">${x.rang}</div>
-      <div class="who"><div>${esc(x.nom)}${meus.has(x.lic) && x.lic !== j.licence ? " ★" : ""}</div><small>${esc(x.club)} · ${esc(x.cat)}</small></div>
-      <div class="pts num">${fmt(x.pts)}</div></div>`).join("");
+      <div class="who"><div>${esc(x.nom)}${meus.has(x.lic) && x.lic !== j.licence ? " ★" : ""}</div><small>${esc(x.club)} · ${esc(x.cat)}${d.virtuel ? ` · mensuels ${fmt(x.mensuels)}` : ""}</small></div>
+      <div class="pts num">${d.virtuel ? fmt(Math.round(x.pts*10)/10) : fmt(x.pts)}${d.virtuel ? `<div style="font-size:13px" class="${x.virtuels - x.mensuels >= 0 ? "pos" : "neg"}">${fmt(Math.round((x.virtuels - x.mensuels)*10)/10, true)}</div>` : ""}</div></div>`).join("");
   $("rLista").innerHTML = linhas || `<div class="empty">Personne dans cette sélection.</div>`;
   if (d.joueurs.length > 400 && iEu <= 300) $("rLista").innerHTML += `<div class="empty">… ${d.joueurs.length - 400} autres</div>`;
   const alvo = $("rEu"); if (alvo) setTimeout(() => alvo.scrollIntoView({block: "center", behavior: "smooth"}), 150);
 }
 ["rCat", "rDep"].forEach(id => $(id).addEventListener("change", carregaRang));
+document.querySelectorAll("[data-modo]").forEach(b => b.onclick = () => { rModo = b.dataset.modo; document.querySelectorAll("[data-modo]").forEach(x => x.classList.toggle("on", x === b)); carregaRang(); });
 document.querySelectorAll("[data-sexe]").forEach(b => b.onclick = () => { rSexe = b.dataset.sexe; document.querySelectorAll("[data-sexe]").forEach(x => x.classList.toggle("on", x === b)); carregaRang(); });
 
 // démarrage

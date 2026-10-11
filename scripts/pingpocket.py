@@ -76,10 +76,10 @@ def base(moi, adv, v):
     e = abs(moi - adv); t = next(x for x in TR if e < x[0])
     return (t[1] if moi >= adv else t[3]) if v else (t[2] if moi <= adv else t[4])
 
-def completa(ms, mens):
+def completa(ms, mens, vistos=None):
     """Jogos ainda em espera: pontos mensais do adversario (1 visita por adversario), vitoria/derrota nos jogos a 0
     e o coeficiente da prova deduzido dos pontos mostrados pela Ping Pocket (calculados com os pontos mensais)."""
-    vistos = {}
+    vistos = {} if vistos is None else vistos     # cache dos pontos dos adversarios (partilhada entre jogadores)
     for m in ms:
         lic = m.pop("_lic", "")
         if m["officiel"] or not lic or not mens: continue

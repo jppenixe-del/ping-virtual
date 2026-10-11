@@ -17,6 +17,7 @@ ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767"}
 TRAVA = threading.Lock()
 CACHE = {}
 CLAS_F = "/root/ping-virtual-cache/classement_bretagne.json"; CLAS = None
+TOPV_F = "/root/ping-virtual-cache/top_virtuel.json"
 
 def publica(lic):
     with TRAVA:
@@ -71,6 +72,7 @@ class H(BaseHTTPRequestHandler):
             if CLAS is None or CLAS[0] != mt: CLAS = (mt, json.load(open(CLAS_F)))
         except OSError: return self.responde(503, {"erreur": "Classement en préparation, réessaie plus tard"})
         doc = CLAS[1]; cat = q.get("cat", "").lower(); sexe = q.get("sexe", ""); dep = q.get("dep", "")
+        if q.get("mode") == "virtuel": return self.top_virtuel(cat, sexe, dep)
         js = [j for j in doc["joueurs"] if (not cat or j["cat"].lower().startswith(cat)) and (not sexe or j["sexe"] == sexe) and (not dep or j["dep"] == dep)]
         vistos, lista = set(), []
         for j in sorted(js, key=lambda j: -j["pts"]):
@@ -78,6 +80,15 @@ class H(BaseHTTPRequestHandler):
             vistos.add(j["lic"]); lista.append(j)
         for i, j in enumerate(lista): j["rang"] = lista[i-1]["rang"] if i and lista[i-1]["pts"] == j["pts"] else i + 1   # ex aequo
         self.responde(200, {"maj": doc["maj"], "region": doc["region"], "comites": doc["comites"], "total": len(lista), "joueurs": lista})
+    def top_virtuel(self, cat, sexe, dep):
+        try: doc = json.load(open(TOPV_F))
+        except OSError: return self.responde(503, {"erreur": "Top virtuel en préparation, réessaie plus tard"})
+        fonte = next((v for k, v in doc["categories"].items() if cat.startswith(k.lower())), None)
+        if fonte is None: return self.responde(404, {"erreur": "Top virtuel disponible seulement pour les Benjamins"})
+        js = [dict(j) for j in fonte if (not cat or j["cat"].lower().startswith(cat)) and (not sexe or j["sexe"] == sexe) and (not dep or j["dep"] == dep)]
+        js.sort(key=lambda j: -j["virtuels"])
+        for i, j in enumerate(js): j["rang"] = i + 1; j["pts"] = j["virtuels"]
+        self.responde(200, {"maj": doc["maj"], "total": len(js), "virtuel": True, "joueurs": js})
     def log_message(self, *a): pass
 
 if __name__ == "__main__":
