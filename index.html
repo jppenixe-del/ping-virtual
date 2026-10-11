@@ -420,7 +420,7 @@ document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
 });
 $("selJoueur").onchange = e => {
   const v = e.target.value;
-  if (v.startsWith("lic:")){ ajouteLicence(v.slice(4)); return; }
+  if (v.startsWith("lic:")){ ajouteLicence(v.slice(4), true); return; }
   D.actif = v; sauve(); $("sMoi").value = ""; tudo();
 };
 $("bW").onclick = () => { vitoria = true; $("bW").classList.add("on"); $("bL").classList.remove("on"); prev(); };
@@ -452,25 +452,35 @@ async function lerJson(u){ try { const r = await fetch(u + "?t=" + Date.now(), {
 function criaPerfil(lic, d){
   const n = {id:uid(), nom:(d && d.nom) || ("Licence " + lic), licence:lic, mens:(d && d.mensuels) || 500, depuis:"", matchs:[]};
   D.joueurs = D.joueurs.filter(j => !j.demo);           // l'exemple part dès qu'il y a un vrai joueur
-  D.joueurs.push(n); D.actif = n.id; sauve(); tudo(); sync(n); return n;
+  D.joueurs.push(n); D.actif = n.id; if (d && d.matchs) aplica(n, d); sauve(); tudo(); return n;
 }
-let espera = null;
-async function ajouteLicence(lic){
-  lic = String(lic || "").replace(/\D/g, ""); const st = $("pStat") || {set textContent(v){}, set innerHTML(v){}};
+const API = "https://5-189-185-48.sslip.io/api";
+async function api(caminho, metodo){
+  try { const r = await fetch(API + caminho, {method: metodo || "GET", cache: "no-store"}); const d = await r.json().catch(() => ({})); return r.ok ? d : {erreur: d.erreur || "Erreur " + r.status}; }
+  catch(e){ return {erreur: "Serveur injoignable (vérifie la connexion)"}; }
+}
+async function ajouteLicence(lic, direto){
+  lic = String(lic || "").replace(/\D/g, "");
+  const st = $("pStat") || {set textContent(v){}, set innerHTML(v){}};
   if (!/^\d{5,8}$/.test(lic)){ st.textContent = "Numéro de licence invalide."; return; }
   const ja = D.joueurs.find(j => j.licence === lic); if (ja){ D.actif = ja.id; sauve(); tudo(); $("modal").hidden = true; return; }
-  st.textContent = "Recherche…";
-  const d = await lerJson(`data/${lic}.json`);
-  if (d){ criaPerfil(lic, d); $("modal").hidden = true; return; }
+  if (direto){ const d = await lerJson(`data/${lic}.json`); if (d){ criaPerfil(lic, d); $("modal").hidden = true; return; } }
   if (!$("pStat")){ $("btnJoueur").onclick(); setTimeout(() => { $("pLic").value = lic; ajouteLicence(lic); }, 300); return; }
-  st.innerHTML = `Licence <b>${lic}</b> pas encore suivie. Demande l'ajout (il faut être connecté au compte GitHub du propriétaire) ; le profil se crée tout seul en quelques minutes (garde l'appli ouverte).
-    <div class="row-actions"><a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://github.com/${REPO}/issues/new?title=${encodeURIComponent("ajouter licence " + lic)}&body=${encodeURIComponent("Demande envoyée par Ping Virtual. Ne rien changer, appuyer sur « Create / Submit ».")}">Demander l'ajout</a></div>`;
-  clearInterval(espera); let n = 0;
-  espera = setInterval(async () => {
-    n++; const d2 = await lerJson(`data/${lic}.json`);
-    if (d2){ clearInterval(espera); criaPerfil(lic, d2); if (!$("modal").hidden && $("pStat")) $("pStat").textContent = "Profil créé ✓"; }
-    else if (n > 60){ clearInterval(espera); if ($("pStat")) $("pStat").textContent = "Toujours rien : vérifie que la demande GitHub a bien été envoyée."; }
-  }, 15000);
+  st.textContent = "Vérification de la licence…";
+  const a = await api(`/joueur/${lic}/apercu`);
+  if (a.erreur){ st.textContent = a.erreur; return; }
+  st.innerHTML = `<div class="card" style="margin-top:8px;padding:12px">
+      <div style="font-weight:700;font-size:16px">${esc(a.nom)}</div>
+      <div class="hint" style="margin-top:2px">${esc(a.club || "")}${a.categorie ? " · " + esc(a.categorie) : ""} · licence ${lic}</div>
+      <div style="margin-top:6px">Classé <b class="num">${a.classement ?? "—"}</b> · <b class="num">${a.mensuels ?? "—"}</b> pts mensuels</div>
+      <div class="row-actions"><button class="btn" id="pConf">Confirmer et ajouter</button><button class="btn ghost" id="pNao">Annuler</button></div></div>`;
+  $("pNao").onclick = () => { st.textContent = ""; };
+  $("pConf").onclick = async () => {
+    st.textContent = "Création du profil : récupération des matchs (quelques secondes)…";
+    let d = a.suivi ? await lerJson(`data/${lic}.json`) : null;
+    if (!d){ d = await api(`/joueur/${lic}`, "POST"); if (d.erreur){ st.textContent = d.erreur; return; } }
+    criaPerfil(lic, d); $("modal").hidden = true;
+  };
 }
 $("btnJoueur").onclick = async () => {
   const j = J();
@@ -506,7 +516,7 @@ $("btnJoueur").onclick = async () => {
   const idx = await lerJson("data/index.json"); if (idx){ IDX = idx; renderJoueurs(); }
   const livres = (idx || []).filter(x => !D.joueurs.some(p => p.licence === x.licence));
   if (livres.length && $("pSuivis")) $("pSuivis").innerHTML = `<p class="hint" style="margin-top:10px">Joueurs suivis :</p><div class="row-actions" style="margin-top:4px">${livres.map(x => `<button class="btn ghost small" data-lic="${x.licence}">+ ${esc(x.nom || x.licence)}${x.club ? ` <span style="opacity:.7">· ${esc(x.club)}</span>` : ""}</button>`).join("")}</div>`;
-  $("modalBody").querySelectorAll("[data-lic]").forEach(bt => bt.onclick = () => ajouteLicence(bt.dataset.lic));
+  $("modalBody").querySelectorAll("[data-lic]").forEach(bt => bt.onclick = () => ajouteLicence(bt.dataset.lic, true));
 };
 $("bExport").onclick = () => {
   const txt = JSON.stringify(D);
@@ -604,16 +614,19 @@ async function sync(j, avisa){
   const info = $("ppInfo"); if (info) info.textContent = "mise à jour…";
   try {
     const r = await fetch(`data/${j.licence}.json?t=${Date.now()}`, {cache: "no-store"});
-    if (r.status === 404){ if (info) info.textContent = "licence pas encore suivie (à ajouter dans licences.txt)"; return; }
+    if (r.status === 404){ if (info) info.textContent = ""; return; }
     if (!r.ok) throw 0;
     const d = await r.json();
+    aplica(j, d); sauve(); tudo();
+  } catch(e){ if (info) info.textContent = "hors ligne : données du " + (j.pp && j.pp.maj ? dataFr(j.pp.maj.slice(0,10)) : "—"); }
+}
+function aplica(j, d){
     const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:m.coef || c.coef, epreuve:m.epreuve, adv:m.adv || "", advPts:m.advPts ?? null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
     j.matchs = j.matchs.filter(m => m.src !== "pp").concat(novos);
     if (d.mensuels) j.mens = d.mensuels;
     if (!j.ppInit){ const hj = new Date(); const ano = hj.getMonth() >= 6 ? hj.getFullYear() : hj.getFullYear() - 1; j.depuis = `${ano}-07-01`; j.ppInit = true; }
     j.pp = {maj: d.maj, classement: d.classement, officielsPhase: d.officielsPhase, lu: Date.now()};
-    j.demo = false; sauve(); tudo();
-  } catch(e){ if (info) info.textContent = "hors ligne : données du " + (j.pp && j.pp.maj ? dataFr(j.pp.maj.slice(0,10)) : "—"); }
+    j.demo = false;
 }
 function infoPP(){
   const j = J(), bar = $("ppBar"); bar.hidden = !j.licence;
