@@ -307,8 +307,11 @@ function res(j, m){
 // ---------------- rendu
 const $ = id => document.getElementById(id);
 function opts(sel, val){ sel.innerHTML = COMPS.map(c => `<option value="${c.id}">${c.nom}${c.id!=="autre" ? " · ×"+fmt(c.coef) : ""}</option>`).join(""); if (val) sel.value = val; }
+let IDX = [];   // les joueurs suivis (data/index.json): ils apparaissent aussi dans la liste du haut
 function renderJoueurs(){
-  $("selJoueur").innerHTML = D.joueurs.map(j => `<option value="${j.id}">${esc(j.nom)}</option>`).join("");
+  const livres = IDX.filter(x => !D.joueurs.some(p => p.licence === x.licence));
+  $("selJoueur").innerHTML = D.joueurs.map(j => `<option value="${j.id}">${esc(j.nom)}</option>`).join("") +
+    (livres.length ? `<optgroup label="Joueurs suivis">${livres.map(x => `<option value="lic:${x.licence}">+ ${esc(x.nom || x.licence)}</option>`).join("")}</optgroup>` : "");
   $("selJoueur").value = J().id;
 }
 function esc(s){ return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -415,7 +418,11 @@ document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
   try { localStorage.setItem(CLE + ".onglet", b.dataset.v); } catch(e){}
   window.scrollTo(0, 0);
 });
-$("selJoueur").onchange = e => { D.actif = e.target.value; sauve(); $("sMoi").value = ""; tudo(); };
+$("selJoueur").onchange = e => {
+  const v = e.target.value;
+  if (v.startsWith("lic:")){ ajouteLicence(v.slice(4)); return; }
+  D.actif = v; sauve(); $("sMoi").value = ""; tudo();
+};
 $("bW").onclick = () => { vitoria = true; $("bW").classList.add("on"); $("bL").classList.remove("on"); prev(); };
 $("bL").onclick = () => { vitoria = false; $("bL").classList.add("on"); $("bW").classList.remove("on"); prev(); };
 ["mAdvPts","mComp","mCoef"].forEach(id => $(id).addEventListener("input", prev));
@@ -449,12 +456,13 @@ function criaPerfil(lic, d){
 }
 let espera = null;
 async function ajouteLicence(lic){
-  lic = String(lic || "").replace(/\D/g, ""); const st = $("pStat");
+  lic = String(lic || "").replace(/\D/g, ""); const st = $("pStat") || {set textContent(v){}, set innerHTML(v){}};
   if (!/^\d{5,8}$/.test(lic)){ st.textContent = "Numéro de licence invalide."; return; }
   const ja = D.joueurs.find(j => j.licence === lic); if (ja){ D.actif = ja.id; sauve(); tudo(); $("modal").hidden = true; return; }
   st.textContent = "Recherche…";
   const d = await lerJson(`data/${lic}.json`);
   if (d){ criaPerfil(lic, d); $("modal").hidden = true; return; }
+  if (!$("pStat")){ $("btnJoueur").onclick(); setTimeout(() => { $("pLic").value = lic; ajouteLicence(lic); }, 300); return; }
   st.innerHTML = `Licence <b>${lic}</b> pas encore suivie. Demande l'ajout (il faut être connecté au compte GitHub du propriétaire) ; le profil se crée tout seul en quelques minutes (garde l'appli ouverte).
     <div class="row-actions"><a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://github.com/${REPO}/issues/new?title=${encodeURIComponent("ajouter licence " + lic)}&body=${encodeURIComponent("Demande envoyée par Ping Virtual. Ne rien changer, appuyer sur « Create / Submit ».")}">Demander l'ajout</a></div>`;
   clearInterval(espera); let n = 0;
@@ -495,7 +503,7 @@ $("btnJoueur").onclick = async () => {
     D.actif = D.joueurs[0].id; sauve(); $("modal").hidden = true; tudo();
   };
   // les joueurs déjà suivis (un toque pour les ajouter)
-  const idx = await lerJson("data/index.json");
+  const idx = await lerJson("data/index.json"); if (idx){ IDX = idx; renderJoueurs(); }
   const livres = (idx || []).filter(x => !D.joueurs.some(p => p.licence === x.licence));
   if (livres.length && $("pSuivis")) $("pSuivis").innerHTML = `<p class="hint" style="margin-top:10px">Joueurs suivis :</p><div class="row-actions" style="margin-top:4px">${livres.map(x => `<button class="btn ghost small" data-lic="${x.licence}">+ ${esc(x.nom || x.licence)}${x.club ? ` <span style="opacity:.7">· ${esc(x.club)}</span>` : ""}</button>`).join("")}</div>`;
   $("modalBody").querySelectorAll("[data-lic]").forEach(bt => bt.onclick = () => ajouteLicence(bt.dataset.lic));
@@ -616,6 +624,7 @@ $("ppSync").onclick = () => sync(J(), true);
 // démarrage
 opts($("mComp"), "crit"); opts($("sComp"), "crit"); $("mDate").value = hoje();
 tudo();
+lerJson("data/index.json").then(x => { if (x){ IDX = x; renderJoueurs(); } });
 { const j = J(); if (j.licence && (!j.pp || Date.now() - (j.pp.lu || 0) > 3*3600*1000)) sync(j); }
 try { const o = localStorage.getItem(CLE + ".onglet"); if (o) document.querySelector(`nav.tabs button[data-v="${o}"]`)?.click(); } catch(e){}
 })();
