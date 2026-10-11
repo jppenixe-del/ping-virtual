@@ -250,6 +250,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <h2>Coefficients</h2>
     <div class="card tablewrap"><table class="grille" id="coefs"></table></div>
     <p class="note" style="margin-top:12px">Les coefficients peuvent changer d'une saison à l'autre : en cas de doute, choisis « Autre » et saisis le coefficient indiqué par la FFTT. Résultat officiel : seule la situation mensuelle FFTT fait foi.</p>
+    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-10</span></p>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Les données restent sur ce téléphone. Exporte-les pour les garder ou les passer sur un autre appareil.</p>
@@ -695,7 +696,14 @@ lerJson("data/index.json").then(x => { if (x){ IDX = x; renderJoueurs(); } });
 { const j = J(); if (j.licence && (!j.pp || Date.now() - (j.pp.lu || 0) > 3*3600*1000)) sync(j); }
 try { const o = localStorage.getItem(CLE + ".onglet"); if (o) document.querySelector(`nav.tabs button[data-v="${o}"]`)?.click(); } catch(e){}
 })();
-if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }
+// mises à jour: à chaque ouverture on demande la nouvelle version; quand elle s'installe, l'appli se recharge seule
+if ("serviceWorker" in navigator) {
+  const jaControlado = !!navigator.serviceWorker.controller; let recarregou = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (jaControlado && !recarregou){ recarregou = true; location.reload(); } });
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js", {updateViaCache: "none"}).then(r => {
+    r.update(); document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") r.update(); });
+  }).catch(() => {}));
+}
 </script>
 
 </body>

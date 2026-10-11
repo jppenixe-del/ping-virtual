@@ -1,5 +1,5 @@
 // Ping Virtuel: funciona sem internet (a app guarda-se no telemovel na primeira abertura)
-const VERSAO = "pv-9";
+const VERSAO = "pv-10";
 const APP = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(APP)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {
@@ -11,7 +11,7 @@ self.addEventListener("fetch", e => {
   if (url.origin === location.origin && url.pathname.includes("/data/")) return;   // les données: toujours du réseau
   if (url.origin === location.origin) {
     // a app: rede primeiro (para receber as atualizacoes), cache se nao houver internet
-    e.respondWith(fetch(e.request).then(r => { const c = r.clone(); caches.open(VERSAO).then(k => k.put(e.request, c)); return r; })
+    e.respondWith(fetch(e.request, {cache: "no-cache"}).then(r => { const c = r.clone(); caches.open(VERSAO).then(k => k.put(e.request, c)); return r; })
       .catch(() => caches.match(e.request).then(r => r || caches.match("index.html"))));
   } else if (url.hostname.endsWith("googleapis.com") || url.hostname.endsWith("gstatic.com")) {
     // as letras: cache primeiro
