@@ -37,4 +37,6 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }} --comment "${{ job.status == 'success' && 'Licence ajoutée ✓ — retourne dans Ping Virtual.' || 'Échec : vérifie le numéro de licence.' }}"
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then MSG="Licence ajoutée ✓ — retourne dans Ping Virtual."; else MSG="Échec — vérifie le numéro de licence."; fi
+          gh issue close ${{ github.event.issue.number }} --repo ${{ github.repository }} --comment "$MSG"

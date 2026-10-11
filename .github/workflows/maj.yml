@@ -4,8 +4,11 @@ on:
     - cron: "15 5 * * *"     # tous les matins
     - cron: "30 20 * * 0,6"  # et le soir des week-ends (jours de compétition)
   workflow_dispatch:
+  push:
+    paths: [licences.txt]     # une licence ajoutée à la main: mise à jour tout de suite
 permissions:
   contents: write
+  issues: write
 concurrency: maj
 jobs:
   maj:
@@ -24,3 +27,12 @@ jobs:
           if git diff --cached --quiet -- data; then echo "rien de nouveau"; exit 0; fi
           git commit -m "Mise à jour Ping Pocket"
           git pull --rebase && git push
+      - name: Fermer les demandes d'ajout déjà traitées
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list --repo ${{ github.repository }} --state open --search "ajouter licence in:title" --json number,title --jq '.[].number'); do
+            LIC=$(gh issue view "$n" --repo ${{ github.repository }} --json title --jq .title | grep -oE '[0-9]{5,8}' | head -1)
+            if [ -n "$LIC" ] && [ -f "data/$LIC.json" ]; then gh issue close "$n" --repo ${{ github.repository }} --comment "Licence ajoutée ✓"; fi
+          done
