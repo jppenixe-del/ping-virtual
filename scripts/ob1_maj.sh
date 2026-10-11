@@ -5,7 +5,7 @@
 set -e
 cd /root/ping-virtual
 exec 9>/tmp/ping-virtual.lock; flock -n 9 || exit 0
-git pull -q --rebase
+git pull -q --rebase --autostash
 DONO=jppenixe-del
 NOVOS=$(curl -s --max-time 30 "https://api.github.com/repos/$DONO/ping-virtual/issues?state=open&per_page=50" | python3 -c "
 import sys, json, re

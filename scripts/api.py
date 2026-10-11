@@ -20,9 +20,11 @@ CLAS_F = "/root/ping-virtual-cache/classement_bretagne.json"; CLAS = None
 
 def publica(lic):
     with TRAVA:
-        subprocess.run(["bash", "-c", f"""cd {REPO} && git pull -q --rebase && (grep -qx {lic} licences.txt || echo {lic} >> licences.txt)
+        # primeiro grava o commit, depois junta o que veio do GitHub (--autostash: nada local bloqueia a publicacao)
+        subprocess.run(["bash", "-c", f"""cd {REPO} && (grep -qx {lic} licences.txt || echo {lic} >> licences.txt)
             && git add licences.txt data && (git diff --cached --quiet || git -c user.name=ping-virtual-bot
-            -c user.email=ping-virtual-bot@users.noreply.github.com commit -qm 'Ajout de la licence {lic}') && git push -q"""], timeout=120)
+            -c user.email=ping-virtual-bot@users.noreply.github.com commit -qm 'Ajout de la licence {lic}')
+            && git pull -q --rebase --autostash && git push -q"""], timeout=120)
 
 class H(BaseHTTPRequestHandler):
     def cors(self):
