@@ -156,6 +156,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
         <div><b class="num" id="hMens">—</b><span>Mensuels</span></div>
         <div><b class="num" id="hBilan">0-0</b><span>V - D</span></div>
       </div>
+      <div class="bar-l" id="hDet" hidden style="margin:10px 0 0"></div>
       <div class="bar"><i id="hBar" style="width:0"></i></div>
       <div class="bar-l"><span id="hBarL">—</span><span id="hBarR">—</span></div>
     </div>
@@ -294,8 +295,11 @@ if (!D || !D.joueurs || !D.joueurs.length){
 function J(){ return D.joueurs.find(j => j.id === D.actif) || D.joueurs[0]; }
 function matchsTries(j){ return j.matchs.slice().sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0); }
 // les matchs Ping Pocket comptent tant qu'ils ne sont pas dans les points mensuels; les autres depuis la date de la situation
-function compte(j){ return matchsTries(j).filter(m => m.src === "pp" ? !m.officiel : (!j.depuis || m.date >= j.depuis)); }
+function compte(j){ return matchsTries(j).filter(m => !j.depuis || m.date >= j.depuis); }
+// Pontos de referencia para os jogos ainda em espera (regra FFTT): os mensais + os jogos ja' validados pela FFTT
+function refPP(j){ let s = j.mens; j.matchs.forEach(m => { if (m.src === "pp" && m.officiel && (!j.depuis || m.date >= j.depuis)) s += m.ptsFixe; }); return s; }
 function res(j, m){
+  if (m.src === "pp" && !m.officiel && m.advPts != null && m.v != null){ const r = calc(refPP(j), m.advPts, m.v, m.coef || 1); return r; }
   if (m.ptsFixe != null) return {pts:m.ptsFixe, base:null, type:"PP", ecart:null};
   return calc(j.mens, m.advPts, m.v, m.coef);
 }
@@ -315,7 +319,7 @@ function renderAccueil(){
   const j = J(), ms = compte(j);
   let tot = 0, v = 0, d = 0; ms.forEach(m => { tot += res(j, m).pts; m.v ? v++ : d++; });
   const virt = j.mens + tot;
-  $("hVirt").textContent = arr(virt);
+  $("hVirt").textContent = (Math.round(virt*10)/10).toFixed(1).replace(".", ",");
   $("hDelta").textContent = (tot >= 0 ? "+" : "") + fmt(tot);
   $("hMens").textContent = j.mens;
   $("hClass").textContent = classement(virt);
@@ -326,6 +330,9 @@ function renderAccueil(){
   $("hBarL").textContent = `Classé ${c}`;
   $("hBarR").textContent = `${fmt(Math.max(0, alvo - virt))} pts pour être classé ${alvo/100}`;
   $("demoFlag").hidden = !j.demo;
+  const pp = ms.filter(m => m.src === "pp"); $("hDet").hidden = !pp.length;
+  if (pp.length){ let a = 0, b = 0; pp.forEach(m => m.officiel ? a += m.ptsFixe : b += res(j, m).pts);
+    $("hDet").innerHTML = `<span>Validés FFTT <b class="num">${fmt(a, true)}</b> → ${fmt(Math.round((j.mens + a)*10)/10)}</span><span>En attente <b class="num">${fmt(b, true)}</b></span>`; }
   renderChart(j, ms);
   $("lastMatches").innerHTML = jours(j, ms.slice(-12).reverse(), false) || `<div class="card empty">Aucun match depuis le ${dataFr(j.depuis)}. Ajoute-les dans « Matchs ».</div>`;
 }
@@ -355,9 +362,9 @@ function jours(j, ms, apagar){
   return grupos.map(gr => {
     let s = 0; gr.ms.forEach(m => s += res(j, m).pts);
     const linhas = gr.ms.map(m => { const r = res(j, m); const tag = r.type === "VA" ? `<span class="tag perf">perf</span>` : r.type === "DA" ? `<span class="tag contre">contre</span>` : "";
-      const fora = m.src === "pp" ? m.officiel : (j.depuis && m.date < j.depuis);
+      const fora = j.depuis && m.date < j.depuis;
       return `<div class="match"><div class="res ${m.v?"w":"l"}">${m.v?"V":m.v===false?"D":"·"}</div>
-        <div class="who"><div>${esc(m.adv || (m.src === "pp" ? (m.v === false ? "Défaite" : m.v ? "Victoire" : "Match") : "Adversaire"))}${m.advPts != null ? ` <small class="num">· ${m.advPts} pts</small>` : ""}</div><small>${m.src === "pp" ? esc(m.epreuve || "") + " · Ping Pocket" : LIB[r.type] + " · écart " + r.ecart}${m.comp==="autre" && m.src !== "pp" ? " · ×"+fmt(m.coef) : ""} ${tag}${fora ? " · déjà dans les points mensuels" : ""}</small></div>
+        <div class="who"><div>${esc(m.adv || (m.src === "pp" ? (m.v === false ? "Défaite" : m.v ? "Victoire" : "Match") : "Adversaire"))}${m.advPts != null ? ` <small class="num">· ${m.advPts} pts</small>` : ""}</div><small>${m.src === "pp" ? esc(m.epreuve || "") + (r.ecart != null ? " · " + LIB[r.type] + " · écart " + Math.round(r.ecart) + " · ×" + fmt(m.coef) : "") : LIB[r.type] + " · écart " + r.ecart}${m.comp==="autre" && m.src !== "pp" ? " · ×"+fmt(m.coef) : ""} ${tag}${fora ? " · déjà dans les points mensuels" : m.src === "pp" ? (m.officiel ? " · validé FFTT" : " · en attente") : ""}</small></div>
         <div><div class="pts ${r.pts>0?"pos":r.pts<0?"neg":""}">${fmt(r.pts, true)}</div>${apagar ? `<button class="del" data-del="${m.id}">supprimer</button>` : ""}</div></div>`; }).join("");
     return `<div class="day"><div class="day-h"><strong>${nomComp(gr.comp)}</strong><small class="num">${dataFr(gr.date)} · <span class="${s>=0?"pos":"neg"}">${fmt(s, true)}</span></small></div><div class="card" style="padding:0">${linhas}</div></div>`;
   }).join("");
@@ -551,9 +558,10 @@ async function sync(j, avisa){
     if (r.status === 404){ if (info) info.textContent = "licence pas encore suivie (à ajouter dans licences.txt)"; return; }
     if (!r.ok) throw 0;
     const d = await r.json();
-    const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:c.coef, epreuve:m.epreuve, adv:"", advPts:null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
+    const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:m.coef || c.coef, epreuve:m.epreuve, adv:m.adv || "", advPts:m.advPts ?? null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
     j.matchs = j.matchs.filter(m => m.src !== "pp").concat(novos);
     if (d.mensuels) j.mens = d.mensuels;
+    if (!j.ppInit){ const hj = new Date(); const ano = hj.getMonth() >= 6 ? hj.getFullYear() : hj.getFullYear() - 1; j.depuis = `${ano}-07-01`; j.ppInit = true; }
     j.pp = {maj: d.maj, classement: d.classement, officielsPhase: d.officielsPhase, lu: Date.now()};
     j.demo = false; sauve(); tudo();
   } catch(e){ if (info) info.textContent = "hors ligne : données du " + (j.pp && j.pp.maj ? dataFr(j.pp.maj.slice(0,10)) : "—"); }
