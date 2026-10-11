@@ -4,6 +4,8 @@ name: Fermer les demandes traitées
 on:
   push:
     paths: ["data/**"]
+  issues:
+    types: [opened]           # demande pour une licence déjà suivie: on ferme tout de suite
   workflow_dispatch:
 permissions:
   issues: write
