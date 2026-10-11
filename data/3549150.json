@@ -1,0 +1,355 @@
+{
+ "licence": "3549150",
+ "maj": "2026-10-11T21:25Z",
+ "classement": 10.0,
+ "mensuels": 1079.0,
+ "officielsPhase": 766.0,
+ "progMensuelle": 43.7,
+ "nom": "GAY Rafaël",
+ "categorie": "Benjamin 2",
+ "club": "CESSON O.C.",
+ "matchs": [
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "MASSELIN Marius",
+   "pts": 8.25,
+   "v": true,
+   "officiel": false,
+   "advPts": 1032.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "SON Lenny",
+   "pts": 7.5,
+   "v": true,
+   "officiel": false,
+   "advPts": 1020.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "VERISSIMO FERRO Martin",
+   "pts": 3.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 835.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "LIBERT TOULOUSE Robin",
+   "pts": 3.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 841.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "LIAIGRE Tao",
+   "pts": 3.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 799.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "SOMMEILLY Thomas",
+   "pts": 1.5,
+   "v": true,
+   "officiel": false,
+   "advPts": 777.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "HALBOT Theo",
+   "pts": 0.75,
+   "v": true,
+   "officiel": false,
+   "advPts": 644.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "MANACH Paul",
+   "pts": -6.75,
+   "v": false,
+   "officiel": false,
+   "advPts": 1126.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-04",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "BRIEC Pascal",
+   "pts": 17.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 1318.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-04",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "LE GUEN Claude",
+   "pts": -2.0,
+   "v": false,
+   "officiel": false,
+   "advPts": 1245.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-04",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "MOAL Franck",
+   "pts": -3.0,
+   "v": false,
+   "officiel": false,
+   "advPts": 1209.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "DORVAL Jean",
+   "pts": 21.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "CAMPANA Loic",
+   "pts": 6.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "CRENN Raphael",
+   "pts": 6.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "ANGE THOMAS Rafael",
+   "pts": 4.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "DOR DA SILVA Octave",
+   "pts": 3.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "REIBALDI Paol",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "BARRAIS Clément",
+   "pts": 0.75,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "CAILLEAU Raphaël",
+   "pts": -2.25,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "MARTIN Sam",
+   "pts": -2.25,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "KERNEC Cedric",
+   "pts": 21.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "DUCLOS Arthur",
+   "pts": 9.75,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "LURON Tom",
+   "pts": 4.125,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "HAMONIAUX Inès",
+   "pts": 3.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "LUCAS Ifig",
+   "pts": 0.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "MAYEUX Lise",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "BLANCHARD Bastien",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "HENNA Mathis",
+   "pts": -2.25,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-20",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "RAIMBAULT Noelig",
+   "pts": 22.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-20",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "DAVID Christian",
+   "pts": -0.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-20",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "GROSOS Cyrille",
+   "pts": -1.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "BAZIN Kylian",
+   "pts": 16.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "CAMPANA Loic",
+   "pts": 6.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "PAPIN Clément",
+   "pts": 4.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "KLUTCHNIKOFF Paulin",
+   "pts": 4.125,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "LANDAIS Andy",
+   "pts": 3.75,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "BARBEY-GOUIN Sasha",
+   "pts": 0.75,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "CHAUVEAU-CLAQUIN Malo",
+   "pts": -0.375,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "RICHOMME Efflam",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "adv": "LEMOUSSU Elouann",
+   "pts": -2.25,
+   "v": false,
+   "officiel": true
+  }
+ ]
+}
