@@ -189,6 +189,14 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
       <p class="hint">Le calcul utilise <b>tes points mensuels</b> (pas les virtuels) et ceux de l'adversaire, comme la FFTT.</p>
     </div>
 
+    <h2>Importer depuis Ping Pocket</h2>
+    <div class="card">
+      <p class="note" style="margin-top:0">Dans Ping Pocket : <b>Exporter mes matchs</b> (CSV). Puis choisis le fichier ici, ou colle son contenu.</p>
+      <div class="row-actions" style="margin-top:0"><label class="btn ghost small" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">Choisir le fichier CSV<input type="file" id="iFile" accept=".csv,.txt,text/csv,text/plain,text/tab-separated-values" hidden></label>
+      <button class="btn ghost small" id="iPaste">Coller le texte</button></div>
+      <div id="iZone"></div>
+    </div>
+
     <h2>Tous les matchs</h2>
     <div id="allMatches"></div>
   </section>
@@ -447,6 +455,84 @@ $("bExport").onclick = () => {
 $("bImport").onclick = () => {
   modal(`<h2 style="margin-top:0">Importer</h2><p class="note">Colle ici un texte exporté. Il remplace les données actuelles.</p><textarea id="tx"></textarea><p class="hint" id="er"></p><div class="row-actions"><button class="btn" id="ok">Importer</button><button class="btn ghost" id="fx">Annuler</button></div>`);
   $("ok").onclick = () => { try { const n = JSON.parse($("tx").value); if (!n.joueurs) throw 0; D = n; sauve(); $("modal").hidden = true; tudo(); } catch(e){ $("er").textContent = "Texte invalide."; } };
+  $("fx").onclick = () => $("modal").hidden = true;
+};
+
+
+// ---------------- import CSV (export "Exporter mes matchs" de Ping Pocket, ou tout tableur)
+function sepDe(linha){ const c = {"\t": 0, ";": 0, ",": 0}; let q = false; for (const ch of linha){ if (ch === '"') q = !q; else if (!q && ch in c) c[ch]++; } return Object.keys(c).sort((a,b) => c[b] - c[a])[0]; }
+function csv(txt){
+  txt = txt.replace(/^﻿/, "").replace(/\r\n?/g, "\n").trim(); if (!txt) return [];
+  const sep = sepDe(txt.split("\n")[0]); const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < txt.length; i++){ const ch = txt[i];
+    if (q){ if (ch === '"'){ if (txt[i+1] === '"'){ cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true; else if (ch === sep){ row.push(cell.trim()); cell = ""; } else if (ch === "\n"){ row.push(cell.trim()); rows.push(row); row = []; cell = ""; } else cell += ch; }
+  row.push(cell.trim()); rows.push(row); return rows.filter(r => r.some(c => c !== ""));
+}
+const norm = s => String(s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+const CAMPOS = [
+  {k:"date", nom:"Date", re:/date|jour/},
+  {k:"adv", nom:"Adversaire (nom)", re:/adversaire|nom|joueur|opposant/},
+  {k:"pts", nom:"Points de l'adversaire", re:/(points?|pts|clt|classement).*(adv|opp)|(adv|opp).*(points?|pts|clt)|^points?$|^pts$|^clt$|classement/},
+  {k:"res", nom:"Résultat (V/D)", re:/^v.?d$|victoire|resultat|result|^v$|gagne/},
+  {k:"comp", nom:"Épreuve / compétition", re:/epreuve|competition|libelle|journee|tour/},
+  {k:"coef", nom:"Coefficient", re:/coef/}];
+function adivinha(cab){
+  const m = {}, usado = j => Object.values(m).includes(j);
+  const acha = re => cab.findIndex((h, j) => re.test(norm(h)) && !usado(j));
+  CAMPOS.forEach(c => {
+    // os pontos: primeiro uma coluna "points"/"pts" (o classement 5, 6, 7... nao serve para o calculo)
+    m[c.k] = c.k === "pts" ? [/(points?|pts).*(adv|opp)|(adv|opp).*(points?|pts)/, /^(points?|pts)\b/, /points?|pts/, c.re].map(acha).find(i => i >= 0) ?? -1 : acha(c.re);
+  });
+  return m;
+}
+function dataDe(s){ s = String(s || "").trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}`;
+  if ((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})/))){ const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; }
+  return ""; }
+function resDe(s){ const n = norm(s); if (/^(v|victoire|gagne|w|win|1|oui)\b/.test(n)) return true; if (/^(d|defaite|perdu|l|loss|0|non)\b/.test(n)) return false; return null; }
+function numDe(s){ const m = String(s || "").replace(",", ".").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : NaN; }
+function compDe(s, coefCol){
+  const n = norm(s), coef = numDe(coefCol);
+  let id = /criterium|crit\b/.test(n) ? "crit" : /championnat de france|chpt de france/.test(n) ? "cf" : /equipe|championnat|chpt|ligue|division|regionale|departementale|pre-?nat|nationale/.test(n) ? "eq" : /tournoi/.test(n) ? "treg" : /finale|classement|individuel/.test(n) ? "indiv" : "";
+  if (!isNaN(coef) && coef > 0){ const c = COMPS.find(c => c.id === id); if (!c || Math.abs(c.coef - coef) > 0.001) return {comp: id && c && Math.abs(c.coef - coef) < 0.001 ? id : "autre", coef}; }
+  if (!id) id = "eq";
+  return {comp:id, coef: COMPS.find(c => c.id === id).coef};
+}
+let IMP = null;
+function abreImport(txt){
+  const rows = csv(txt); if (rows.length < 2){ $("iZone").innerHTML = `<p class="hint">Fichier vide ou illisible.</p>`; return; }
+  let h = 0; for (let i = 0; i < Math.min(5, rows.length); i++){ if (rows[i].some(c => /date|adversaire|nom|epreuve|points?/.test(norm(c)))){ h = i; break; } }
+  IMP = {cab: rows[h], linhas: rows.slice(h + 1), map: adivinha(rows[h])}; desenhaImport();
+}
+function linhasImport(){
+  const j = J(), m = IMP.map, out = [];
+  IMP.linhas.forEach(r => { const pts = numDe(r[m.pts]), v = resDe(r[m.res]), date = dataDe(r[m.date]);
+    if (isNaN(pts) || v === null) return; const c = compDe(m.comp >= 0 ? r[m.comp] : "", m.coef >= 0 ? r[m.coef] : "");
+    out.push({date: date || hoje(), comp:c.comp, coef:c.coef, adv: m.adv >= 0 ? r[m.adv] : "", advPts: Math.round(pts), v, compTxt: m.comp >= 0 ? r[m.comp] : ""}); });
+  return out;
+}
+function desenhaImport(){
+  const j = J(), sel = (k) => `<select data-k="${k}"><option value="-1">—</option>${IMP.cab.map((c, i) => `<option value="${i}" ${IMP.map[k] === i ? "selected" : ""}>${esc(c || "colonne " + (i+1))}</option>`).join("")}</select>`;
+  const ms = linhasImport(), novos = ms.filter(m => !j.depuis || m.date >= j.depuis);
+  const ja = new Set(j.matchs.map(m => m.date + "|" + norm(m.adv) + "|" + m.advPts + "|" + m.v));
+  const reais = novos.filter(m => !ja.has(m.date + "|" + norm(m.adv) + "|" + m.advPts + "|" + m.v));
+  let tot = 0; reais.forEach(m => tot += calc(j.mens, m.advPts, m.v, m.coef).pts);
+  $("iZone").innerHTML = `<div style="margin-top:12px" class="grid2">${CAMPOS.map(c => `<div class="field"><label>${c.nom}</label>${sel(c.k)}</div>`).join("")}</div>
+    <p class="hint">${ms.length} match${ms.length>1?"s":""} reconnu${ms.length>1?"s":""} · ${novos.length} depuis le ${dataFr(j.depuis) || "début"} · <b>${reais.length} nouveau${reais.length>1?"x":""}</b> (les doublons sont ignorés)${reais.length ? ` · total <b class="${tot>=0?"pos":"neg"}">${fmt(tot, true)}</b>` : ""}</p>
+    <div class="card" style="padding:0;margin-top:8px;max-height:260px;overflow:auto">${reais.slice(0, 60).map(m => { const r = calc(j.mens, m.advPts, m.v, m.coef);
+      return `<div class="match"><div class="res ${m.v?"w":"l"}">${m.v?"V":"D"}</div><div class="who"><div>${esc(m.adv || "Adversaire")} <small class="num">· ${m.advPts} pts</small></div><small>${dataFr(m.date)} · ${esc(m.compTxt || nomComp(m.comp))} · ×${fmt(m.coef)}</small></div><div class="pts ${r.pts>0?"pos":r.pts<0?"neg":""}">${fmt(r.pts, true)}</div></div>`; }).join("") || `<div class="empty">Rien de nouveau à importer.</div>`}</div>
+    <div class="row-actions"><button class="btn" id="iOk" ${reais.length ? "" : "disabled"}>Importer ${reais.length} match${reais.length>1?"s":""} pour ${esc(j.nom)}</button><button class="btn ghost" id="iNo">Annuler</button></div>`;
+  $("iZone").querySelectorAll("select[data-k]").forEach(s => s.onchange = () => { IMP.map[s.dataset.k] = parseInt(s.value); desenhaImport(); });
+  $("iNo").onclick = () => { IMP = null; $("iZone").innerHTML = ""; };
+  const ok = $("iOk"); if (ok) ok.onclick = () => { reais.forEach(m => j.matchs.push({id:uid(), date:m.date, comp:m.comp, coef:m.coef, adv:m.adv, advPts:m.advPts, v:m.v})); j.demo = false; sauve(); IMP = null; $("iZone").innerHTML = `<p class="hint">${reais.length} match${reais.length>1?"s":""} importé${reais.length>1?"s":""} ✓</p>`; tudo(); };
+}
+$("iFile").onchange = e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+  r.onload = () => { let t = r.result; if (/Ã©|Ã¨/.test(t)) { /* deja decode */ } abreImport(t); };
+  r.readAsText(f, "UTF-8"); e.target.value = ""; };
+$("iPaste").onclick = () => {
+  modal(`<h2 style="margin-top:0">Coller les matchs</h2><p class="note">Colle le contenu du fichier exporté (ou des lignes copiées d'un tableur).</p><textarea id="tx"></textarea><div class="row-actions"><button class="btn" id="ok">Continuer</button><button class="btn ghost" id="fx">Annuler</button></div>`);
+  $("ok").onclick = () => { const t = $("tx").value; $("modal").hidden = true; abreImport(t); };
   $("fx").onclick = () => $("modal").hidden = true;
 };
 
