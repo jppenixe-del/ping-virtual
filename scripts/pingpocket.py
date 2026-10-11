@@ -43,7 +43,11 @@ def fiche(lic):
                           (r"Points officiels phase \d", "officielsPhase"), (r"Progression mensuelle", "progMensuelle")):
         m = re.search(rotulo, t)
         if m: val[chave] = num(txt(t[m.end():m.end() + 400]))
-    m = re.search(r"<h1>([^<]+)</h1>", t); val["nom"] = html.unescape(m.group(1)).strip() if m else ""
+    m = re.search(r"<h1>([^<]+)</h1>", t); val["nom"] = conserta(html.unescape(m.group(1)).strip()) if m else ""
+    info = re.search(r'<div class="info[^"]*">(.*?)</div>', t, re.S)
+    if info:
+        sp = [conserta(html.unescape(x).strip()) for x in re.findall(r"<span>([^<]*)</span>", info.group(1))]
+        if len(sp) >= 3: val["categorie"], val["club"] = sp[0], sp[2]
     return val
 
 def matchs(lic):
@@ -90,18 +94,27 @@ def completa(ms, mens):
     for m in ms: m.pop("_lic", None)
     return ms
 
+def indice():
+    """data/index.json: os jogadores seguidos (para a lista da app)"""
+    lista = []
+    for nome in sorted(os.listdir("data")):
+        if not re.fullmatch(r"\d+\.json", nome): continue
+        d = json.load(open("data/" + nome))
+        lista.append({k: d.get(k) for k in ("licence", "nom", "club", "categorie", "mensuels", "maj")})
+    json.dump(lista, open("data/index.json", "w"), ensure_ascii=False, indent=1)
+
 def main(licences):
     os.makedirs("data", exist_ok=True)
     for lic in licences:
         lic = lic.strip()
         if not re.fullmatch(r"\d{5,8}", lic): continue
         f = fiche(lic); time.sleep(3); ms = completa(matchs(lic), f.get("mensuels"))
-        f.pop("nom", None)          # pas de nom dans le fichier public
         doc = {"licence": lic, "maj": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), **f, "matchs": ms}
         json.dump(doc, open(f"data/{lic}.json", "w"), ensure_ascii=False, indent=1)
         val = sum(m["pts"] for m in ms if m["officiel"]); nao = sum(m["pts"] for m in ms if not m["officiel"])
         print(lic, len(ms), "matchs;", f.get("mensuels"), "+ validés", round(val, 2), "+ en attente", round(nao, 2))
         time.sleep(5)
+    indice()
 
 if __name__ == "__main__":
     main(sys.argv[1:] or open("licences.txt").read().split())

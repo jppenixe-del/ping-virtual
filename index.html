@@ -137,7 +137,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <div class="brand"><i></i>PING VIRTUAL</div>
     <div class="player-sel">
       <select id="selJoueur" aria-label="Joueur"></select>
-      <button class="icon-btn" id="btnJoueur" title="Gérer les joueurs" aria-label="Gérer les joueurs">⚙︎</button>
+      <button class="icon-btn" id="btnJoueur" title="Profils" aria-label="Profils" style="white-space:nowrap">👤</button>
     </div>
   </header>
 
@@ -161,7 +161,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
       <div class="bar-l"><span id="hBarL">—</span><span id="hBarR">—</span></div>
     </div>
     <div class="row-actions" id="ppBar" hidden><button class="btn ghost small" id="ppSync">↻ Mettre à jour (Ping Pocket)</button><span class="hint" id="ppInfo" style="align-self:center;margin:0"></span></div>
-    <div id="demoFlag" class="demo-flag" hidden>Exemple de démonstration : crée ton joueur avec ⚙︎ (ou supprime celui-ci).</div>
+    <div id="demoFlag" class="demo-flag" hidden>Exemple de démonstration : touche 👤 et ajoute un joueur par son n° de licence.</div>
 
     <h2>Évolution depuis la situation mensuelle</h2>
     <div class="card"><svg class="chart" id="chart" viewBox="0 0 520 190" role="img" aria-label="Évolution des points virtuels"></svg></div>
@@ -439,18 +439,54 @@ $("allMatches").addEventListener("click", e => {
 // gestion des joueurs
 function modal(html){ $("modalBody").innerHTML = html; $("modal").hidden = false; }
 $("modal").addEventListener("click", e => { if (e.target.id === "modal") $("modal").hidden = true; });
-$("btnJoueur").onclick = () => {
+// ---------------- les profils: liste, ajout par n° de licence, réglages du profil
+const REPO = location.hostname.endsWith("github.io") ? `${location.hostname.split(".")[0]}/${location.pathname.split("/")[1]}` : "jppenixe-del/ping-virtual";
+async function lerJson(u){ try { const r = await fetch(u + "?t=" + Date.now(), {cache:"no-store"}); return r.ok ? await r.json() : null; } catch(e){ return null; } }
+function criaPerfil(lic, d){
+  const n = {id:uid(), nom:(d && d.nom) || ("Licence " + lic), licence:lic, mens:(d && d.mensuels) || 500, depuis:"", matchs:[]};
+  D.joueurs = D.joueurs.filter(j => !j.demo);           // l'exemple part dès qu'il y a un vrai joueur
+  D.joueurs.push(n); D.actif = n.id; sauve(); tudo(); sync(n); return n;
+}
+let espera = null;
+async function ajouteLicence(lic){
+  lic = String(lic || "").replace(/\D/g, ""); const st = $("pStat");
+  if (!/^\d{5,8}$/.test(lic)){ st.textContent = "Numéro de licence invalide."; return; }
+  const ja = D.joueurs.find(j => j.licence === lic); if (ja){ D.actif = ja.id; sauve(); tudo(); $("modal").hidden = true; return; }
+  st.textContent = "Recherche…";
+  const d = await lerJson(`data/${lic}.json`);
+  if (d){ criaPerfil(lic, d); $("modal").hidden = true; return; }
+  st.innerHTML = `Licence <b>${lic}</b> pas encore suivie. Demande l'ajout (il faut être connecté au compte GitHub du propriétaire) ; le profil se crée tout seul en 1 à 2 minutes.
+    <div class="row-actions"><a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://github.com/${REPO}/issues/new?title=${encodeURIComponent("ajouter licence " + lic)}&body=${encodeURIComponent("Demande envoyée par Ping Virtual. Ne rien changer, appuyer sur « Create / Submit ».")}">Demander l'ajout</a></div>`;
+  clearInterval(espera); let n = 0;
+  espera = setInterval(async () => {
+    n++; const d2 = await lerJson(`data/${lic}.json`);
+    if (d2){ clearInterval(espera); criaPerfil(lic, d2); if (!$("modal").hidden && $("pStat")) $("pStat").textContent = "Profil créé ✓"; }
+    else if (n > 30){ clearInterval(espera); if ($("pStat")) $("pStat").textContent = "Toujours rien : vérifie que la demande GitHub a bien été envoyée."; }
+  }, 15000);
+}
+$("btnJoueur").onclick = async () => {
   const j = J();
-  modal(`<h2 style="margin-top:0">Joueur</h2>
+  const perfis = D.joueurs.map(p => `<button class="btn ${p.id === j.id ? "" : "ghost"} small" data-perfil="${p.id}">${esc(p.nom)}${p.licence ? ` <span class="num" style="opacity:.75">· ${p.licence}</span>` : ""}</button>`).join("");
+  modal(`<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Profils</h2><button class="icon-btn" id="pFecha" aria-label="Fermer">✕</button></div>
+    <div class="row-actions" style="margin-top:0">${perfis}</div>
+    <h2>Ajouter par n° de licence</h2>
+    <div style="display:flex;gap:8px"><input type="text" id="pLic" inputmode="numeric" placeholder="ex. 3541487"><button class="btn" id="pAdd">Ajouter</button></div>
+    <div class="hint" id="pStat"></div>
+    <div id="pSuivis"></div>
+    <h2>Profil « ${esc(j.nom)} »</h2>
     <div class="field"><label for="jNom">Nom</label><input type="text" id="jNom" value="${esc(j.nom)}"></div>
+    <div class="field" style="margin-top:10px"><label for="jLic">N° de licence (mise à jour automatique)</label><input type="text" id="jLic" inputmode="numeric" value="${esc(j.licence || "")}"></div>
     <div class="grid2" style="margin-top:10px">
-      <div class="field"><label for="jMens">Points mensuels (FFTT)</label><input type="number" id="jMens" inputmode="numeric" value="${j.mens}"></div>
-      <div class="field"><label for="jDepuis">Situation du</label><input type="date" id="jDepuis" value="${j.depuis || ""}"></div>
+      <div class="field"><label for="jMens">Points mensuels</label><input type="number" id="jMens" inputmode="decimal" value="${j.mens}" ${j.licence ? "disabled" : ""}></div>
+      <div class="field"><label for="jDepuis">Matchs comptés depuis</label><input type="date" id="jDepuis" value="${j.depuis || ""}"></div>
     </div>
-    <div class="field" style="margin-top:10px"><label for="jLic">N° de licence FFTT (mise à jour automatique)</label><input type="text" id="jLic" inputmode="numeric" value="${esc(j.licence || "")}" placeholder="ex. 3541487"></div>
-    <p class="hint">Avec la licence, les points mensuels et les matchs viennent de Ping Pocket. Sans licence : mets les points de la dernière situation mensuelle et sa date ; seuls les matchs à partir de cette date comptent.</p>
-    <div class="row-actions"><button class="btn" id="jOk">Enregistrer</button><button class="btn ghost" id="jNovo">+ Nouveau joueur</button><button class="btn danger" id="jDel">Supprimer</button></div>`);
-  $("jOk").onclick = () => { if (j.demo) j.matchs = []; /* les matchs d'exemple partent */ j.nom = $("jNom").value.trim() || j.nom; j.mens = parseFloat($("jMens").value) || j.mens; j.depuis = $("jDepuis").value; j.licence = $("jLic").value.replace(/\D/g, ""); j.demo = false; sauve(); $("modal").hidden = true; $("sMoi").value = ""; tudo(); if (j.licence) sync(j, true); };
+    <p class="hint">Avec une licence, les points et les matchs viennent de Ping Pocket. Sans licence, tu saisis tout à la main.</p>
+    <div class="row-actions"><button class="btn" id="jOk">Enregistrer</button><button class="btn ghost" id="jNovo">+ Profil manuel</button><button class="btn danger" id="jDel">Supprimer</button></div>`);
+  $("pFecha").onclick = () => $("modal").hidden = true;
+  $("modalBody").querySelectorAll("[data-perfil]").forEach(bt => bt.onclick = () => { D.actif = bt.dataset.perfil; sauve(); $("sMoi").value = ""; tudo(); $("btnJoueur").onclick(); });
+  $("pAdd").onclick = () => ajouteLicence($("pLic").value);
+  $("pLic").addEventListener("keydown", e => { if (e.key === "Enter") ajouteLicence($("pLic").value); });
+  $("jOk").onclick = () => { if (j.demo) j.matchs = []; j.nom = $("jNom").value.trim() || j.nom; if (!$("jMens").disabled) j.mens = parseFloat($("jMens").value) || j.mens; j.depuis = $("jDepuis").value; const l = $("jLic").value.replace(/\D/g, ""); const mudou = l !== (j.licence || ""); j.licence = l; j.demo = false; sauve(); $("modal").hidden = true; $("sMoi").value = ""; tudo(); if (j.licence && mudou) sync(j, true); };
   $("jNovo").onclick = () => { const n = {id:uid(), nom:"Nouveau joueur", mens:500, depuis:hoje().slice(0,8) + "01", matchs:[]}; D.joueurs.push(n); D.actif = n.id; sauve(); tudo(); $("btnJoueur").onclick(); };
   $("jDel").onclick = e => {
     if (e.target.dataset.ok !== "1"){ e.target.dataset.ok = "1"; e.target.textContent = "Confirmer la suppression"; return; }
@@ -458,6 +494,11 @@ $("btnJoueur").onclick = () => {
     if (!D.joueurs.length){ const n = {id:uid(), nom:"Mon joueur", mens:500, depuis:hoje().slice(0,8) + "01", matchs:[]}; D.joueurs.push(n); }
     D.actif = D.joueurs[0].id; sauve(); $("modal").hidden = true; tudo();
   };
+  // les joueurs déjà suivis (un toque pour les ajouter)
+  const idx = await lerJson("data/index.json");
+  const livres = (idx || []).filter(x => !D.joueurs.some(p => p.licence === x.licence));
+  if (livres.length && $("pSuivis")) $("pSuivis").innerHTML = `<p class="hint" style="margin-top:10px">Joueurs suivis :</p><div class="row-actions" style="margin-top:4px">${livres.map(x => `<button class="btn ghost small" data-lic="${x.licence}">+ ${esc(x.nom || x.licence)}${x.club ? ` <span style="opacity:.7">· ${esc(x.club)}</span>` : ""}</button>`).join("")}</div>`;
+  $("modalBody").querySelectorAll("[data-lic]").forEach(bt => bt.onclick = () => ajouteLicence(bt.dataset.lic));
 };
 $("bExport").onclick = () => {
   const txt = JSON.stringify(D);

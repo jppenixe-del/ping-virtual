@@ -23,4 +23,4 @@ jobs:
           git add data
           if git diff --cached --quiet -- data; then echo "rien de nouveau"; exit 0; fi
           git commit -m "Mise à jour Ping Pocket"
-          git push
+          git pull --rebase && git push
