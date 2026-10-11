@@ -1,0 +1,161 @@
+{
+ "licence": "3538947",
+ "maj": "2026-10-11T21:13Z",
+ "classement": 7.0,
+ "mensuels": 730.0,
+ "officielsPhase": 692.0,
+ "progMensuelle": -5.6,
+ "nom": "RENDEIRO Ana",
+ "categorie": "Sénior",
+ "club": "RENNES CERCLE PAUL BERT",
+ "matchs": [
+  {
+   "date": "2026-10-04",
+   "epreuve": "FED_Championnat de France par Equipes Féminin",
+   "adv": "FHLOR Honorine",
+   "pts": 2.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 500.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-04",
+   "epreuve": "FED_Championnat de France par Equipes Féminin",
+   "adv": "FHLOR Angelique",
+   "pts": 2.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 500.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-04",
+   "epreuve": "FED_Championnat de France par Equipes Féminin",
+   "adv": "LE STRAT Celya",
+   "pts": 2.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 500.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-02",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "ROUAULT Jean-Pierre",
+   "pts": 4.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 612.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-02",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "HALLE Lionel",
+   "pts": 2.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 500.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-02",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "LEPAIGNEUL Remi",
+   "pts": -7.0,
+   "v": false,
+   "officiel": false,
+   "advPts": 648.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "LISTER Quentin",
+   "pts": 4.125,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "HAN Lifeng",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "CELLIER Chloé",
+   "pts": -0.375,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "MALJOKU Orhan",
+   "pts": -3.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "THE Lou-ann",
+   "pts": -4.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-20",
+   "epreuve": "FED_Championnat de France par Equipes Féminin",
+   "adv": "OLAYA Lucie",
+   "pts": 5.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-20",
+   "epreuve": "FED_Championnat de France par Equipes Féminin",
+   "adv": "BOZZI Marie",
+   "pts": 4.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-20",
+   "epreuve": "FED_Championnat de France par Equipes Féminin",
+   "adv": "LE PICART Lydie",
+   "pts": 2.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-18",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "LE GARREC Sven",
+   "pts": 3.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-18",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "JAMES Kevin",
+   "pts": 2.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-18",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "BIGOT Kevin",
+   "pts": -6.0,
+   "v": false,
+   "officiel": true
+  }
+ ]
+}
