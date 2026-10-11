@@ -455,13 +455,13 @@ async function ajouteLicence(lic){
   st.textContent = "Recherche…";
   const d = await lerJson(`data/${lic}.json`);
   if (d){ criaPerfil(lic, d); $("modal").hidden = true; return; }
-  st.innerHTML = `Licence <b>${lic}</b> pas encore suivie. Demande l'ajout (il faut être connecté au compte GitHub du propriétaire) ; le profil se crée tout seul en 1 à 2 minutes.
+  st.innerHTML = `Licence <b>${lic}</b> pas encore suivie. Demande l'ajout (il faut être connecté au compte GitHub du propriétaire) ; le profil se crée tout seul en quelques minutes (garde l'appli ouverte).
     <div class="row-actions"><a class="btn small" style="text-decoration:none" target="_blank" rel="noopener" href="https://github.com/${REPO}/issues/new?title=${encodeURIComponent("ajouter licence " + lic)}&body=${encodeURIComponent("Demande envoyée par Ping Virtual. Ne rien changer, appuyer sur « Create / Submit ».")}">Demander l'ajout</a></div>`;
   clearInterval(espera); let n = 0;
   espera = setInterval(async () => {
     n++; const d2 = await lerJson(`data/${lic}.json`);
     if (d2){ clearInterval(espera); criaPerfil(lic, d2); if (!$("modal").hidden && $("pStat")) $("pStat").textContent = "Profil créé ✓"; }
-    else if (n > 30){ clearInterval(espera); if ($("pStat")) $("pStat").textContent = "Toujours rien : vérifie que la demande GitHub a bien été envoyée."; }
+    else if (n > 60){ clearInterval(espera); if ($("pStat")) $("pStat").textContent = "Toujours rien : vérifie que la demande GitHub a bien été envoyée."; }
   }, 15000);
 }
 $("btnJoueur").onclick = async () => {

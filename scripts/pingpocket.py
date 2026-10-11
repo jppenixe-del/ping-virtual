@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Va chercher sur Ping Pocket (pages publiques) les points et les matchs d'un licencié et écrit data/<licence>.json.
-Une seule visite par licencié et par jour (lancé par .github/workflows/maj.yml): date, épreuve, adversaire, points
+Une seule visite par licencié et par jour (lancé par scripts/ob1_maj.sh, sur ob1): date, épreuve, adversaire, points
 gagnés/perdus et s'ils sont déjà validés par la FFTT."""
 import json, re, sys, time, html, datetime, urllib.request, os
 

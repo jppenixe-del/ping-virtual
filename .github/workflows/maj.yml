@@ -1,38 +1,21 @@
-name: Mise à jour Ping Pocket
+name: Fermer les demandes traitées
+# Les données viennent du serveur ob1 (Ping Pocket bloque les serveurs de GitHub): quand il publie data/, on ferme
+# les demandes « ajouter licence » dont la licence est maintenant suivie.
 on:
-  schedule:
-    - cron: "15 5 * * *"     # tous les matins
-    - cron: "30 20 * * 0,6"  # et le soir des week-ends (jours de compétition)
-  workflow_dispatch:
   push:
-    paths: [licences.txt]     # une licence ajoutée à la main: mise à jour tout de suite
+    paths: ["data/**"]
+  workflow_dispatch:
 permissions:
-  contents: write
   issues: write
-concurrency: maj
 jobs:
-  maj:
+  fermer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python scripts/pingpocket.py
-      - name: Publier si quelque chose a changé
-        run: |
-          git config user.name "ping-virtual-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data
-          if git diff --cached --quiet -- data; then echo "rien de nouveau"; exit 0; fi
-          git commit -m "Mise à jour Ping Pocket"
-          git pull --rebase && git push
-      - name: Fermer les demandes d'ajout déjà traitées
-        if: always()
-        env:
+      - env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for n in $(gh issue list --repo ${{ github.repository }} --state open --search "ajouter licence in:title" --json number,title --jq '.[].number'); do
+          for n in $(gh issue list --repo ${{ github.repository }} --state open --search "ajouter licence in:title" --json number --jq '.[].number'); do
             LIC=$(gh issue view "$n" --repo ${{ github.repository }} --json title --jq .title | grep -oE '[0-9]{5,8}' | head -1)
-            if [ -n "$LIC" ] && [ -f "data/$LIC.json" ]; then gh issue close "$n" --repo ${{ github.repository }} --comment "Licence ajoutée ✓"; fi
+            if [ -n "$LIC" ] && [ -f "data/$LIC.json" ]; then gh issue close "$n" --repo ${{ github.repository }} --comment "Licence ajoutée ✓ — retourne dans Ping Virtual."; fi
           done
