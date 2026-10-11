@@ -159,6 +159,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
       <div class="bar"><i id="hBar" style="width:0"></i></div>
       <div class="bar-l"><span id="hBarL">—</span><span id="hBarR">—</span></div>
     </div>
+    <div class="row-actions" id="ppBar" hidden><button class="btn ghost small" id="ppSync">↻ Mettre à jour (Ping Pocket)</button><span class="hint" id="ppInfo" style="align-self:center;margin:0"></span></div>
     <div id="demoFlag" class="demo-flag" hidden>Exemple de démonstration : crée ton joueur avec ⚙︎ (ou supprime celui-ci).</div>
 
     <h2>Évolution depuis la situation mensuelle</h2>
@@ -255,7 +256,7 @@ const TRANCHES = [ // [écart max (exclu), VN, DN, VA, DA]  (points de base, coe
   [200, 3, -2, 13, -10], [300, 2, -1, 17, -12.5], [400, 1, -0.5, 22, -16], [500, 0.5, 0, 28, -20], [Infinity, 0, 0, 40, -29]];
 const COMPS = [
   {id:"eq", nom:"Championnat par équipes", coef:1},
-  {id:"crit", nom:"Critérium fédéral", coef:1.25},
+  {id:"crit", nom:"Critérium fédéral", coef:1.5},
   {id:"cf", nom:"Championnats de France", coef:1.5},
   {id:"tna", nom:"Tournoi national A / international", coef:1},
   {id:"tnb", nom:"Tournoi national B / C", coef:0.75},
@@ -270,7 +271,7 @@ function calc(moi, adv, victoire, coef){
   else { if (moi <= adv){ base = t[2]; type = "DN"; } else { base = t[4]; type = "DA"; } }
   return {pts: base*coef, base, type, ecart};
 }
-const LIB = {VN:"victoire normale", VA:"perf !", DN:"défaite normale", DA:"contre"};
+const LIB = {VN:"victoire normale", VA:"perf !", DN:"défaite normale", DA:"contre", PP:"calcul Ping Pocket"};
 function classement(p){ return Math.max(5, Math.floor(p/100)); }
 function fmt(n, sign){ const r = Math.round(n*100)/100; const s = (Number.isInteger(r) ? r.toString() : r.toFixed(2).replace(/0$/, "")).replace(".", ","); return (sign && r > 0 ? "+" : "") + s; }
 function arr(n){ return Math.floor(n + 0.5); } // 0,5 arrondi au-dessus
@@ -292,8 +293,12 @@ if (!D || !D.joueurs || !D.joueurs.length){
 }
 function J(){ return D.joueurs.find(j => j.id === D.actif) || D.joueurs[0]; }
 function matchsTries(j){ return j.matchs.slice().sort((a,b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0); }
-function compte(j){ return matchsTries(j).filter(m => !j.depuis || m.date >= j.depuis); }
-function res(j, m){ return calc(j.mens, m.advPts, m.v, m.coef); }
+// les matchs Ping Pocket comptent tant qu'ils ne sont pas dans les points mensuels; les autres depuis la date de la situation
+function compte(j){ return matchsTries(j).filter(m => m.src === "pp" ? !m.officiel : (!j.depuis || m.date >= j.depuis)); }
+function res(j, m){
+  if (m.ptsFixe != null) return {pts:m.ptsFixe, base:null, type:"PP", ecart:null};
+  return calc(j.mens, m.advPts, m.v, m.coef);
+}
 
 // ---------------- rendu
 const $ = id => document.getElementById(id);
@@ -322,7 +327,7 @@ function renderAccueil(){
   $("hBarR").textContent = `${fmt(Math.max(0, alvo - virt))} pts pour être classé ${alvo/100}`;
   $("demoFlag").hidden = !j.demo;
   renderChart(j, ms);
-  $("lastMatches").innerHTML = jours(j, ms.slice(-6).reverse(), false) || `<div class="card empty">Aucun match depuis le ${dataFr(j.depuis)}. Ajoute-les dans « Matchs ».</div>`;
+  $("lastMatches").innerHTML = jours(j, ms.slice(-12).reverse(), false) || `<div class="card empty">Aucun match depuis le ${dataFr(j.depuis)}. Ajoute-les dans « Matchs ».</div>`;
 }
 function renderChart(j, ms){
   const W = 520, H = 190, L = 46, R = 12, T = 14, B = 26;
@@ -341,7 +346,7 @@ function renderChart(j, ms){
   const area = d + ` L${X(pts.length-1)} ${H-B} L${X(0)} ${H-B} Z`;
   let dots = pts.map((p,i) => `<circle cx="${X(i)}" cy="${Y(p)}" r="${i===pts.length-1?5:3.2}" fill="${i===0 ? "var(--muted)" : (ms[i-1].v ? "var(--win)" : "var(--loss)")}" stroke="var(--surface)" stroke-width="1.5"/>`).join("");
   g += `<path d="${area}" fill="var(--table)" opacity=".10"/><path d="${d}" fill="none" stroke="var(--table)" stroke-width="2.5" stroke-linejoin="round"/>` + dots;
-  g += `<text x="${L}" y="${H-8}">${dataFr(j.depuis) || "départ"}</text><text x="${W-R}" y="${H-8}" text-anchor="end">${ms.length} match${ms.length>1?"s":""}</text>`;
+  g += `<text x="${L}" y="${H-8}">${j.licence ? "pts mensuels" : (dataFr(j.depuis) || "départ")}</text><text x="${W-R}" y="${H-8}" text-anchor="end">${ms.length} match${ms.length>1?"s":""}</text>`;
   $("chart").innerHTML = g;
 }
 function jours(j, ms, apagar){
@@ -350,9 +355,9 @@ function jours(j, ms, apagar){
   return grupos.map(gr => {
     let s = 0; gr.ms.forEach(m => s += res(j, m).pts);
     const linhas = gr.ms.map(m => { const r = res(j, m); const tag = r.type === "VA" ? `<span class="tag perf">perf</span>` : r.type === "DA" ? `<span class="tag contre">contre</span>` : "";
-      const fora = j.depuis && m.date < j.depuis;
-      return `<div class="match"><div class="res ${m.v?"w":"l"}">${m.v?"V":"D"}</div>
-        <div class="who"><div>${esc(m.adv || "Adversaire")} <small class="num">· ${m.advPts} pts</small></div><small>${LIB[r.type]} · écart ${r.ecart}${m.comp==="autre" ? " · ×"+fmt(m.coef) : ""} ${tag}${fora ? " · déjà dans les points mensuels" : ""}</small></div>
+      const fora = m.src === "pp" ? m.officiel : (j.depuis && m.date < j.depuis);
+      return `<div class="match"><div class="res ${m.v?"w":"l"}">${m.v?"V":m.v===false?"D":"·"}</div>
+        <div class="who"><div>${esc(m.adv || (m.src === "pp" ? (m.v === false ? "Défaite" : m.v ? "Victoire" : "Match") : "Adversaire"))}${m.advPts != null ? ` <small class="num">· ${m.advPts} pts</small>` : ""}</div><small>${m.src === "pp" ? esc(m.epreuve || "") + " · Ping Pocket" : LIB[r.type] + " · écart " + r.ecart}${m.comp==="autre" && m.src !== "pp" ? " · ×"+fmt(m.coef) : ""} ${tag}${fora ? " · déjà dans les points mensuels" : ""}</small></div>
         <div><div class="pts ${r.pts>0?"pos":r.pts<0?"neg":""}">${fmt(r.pts, true)}</div>${apagar ? `<button class="del" data-del="${m.id}">supprimer</button>` : ""}</div></div>`; }).join("");
     return `<div class="day"><div class="day-h"><strong>${nomComp(gr.comp)}</strong><small class="num">${dataFr(gr.date)} · <span class="${s>=0?"pos":"neg"}">${fmt(s, true)}</span></small></div><div class="card" style="padding:0">${linhas}</div></div>`;
   }).join("");
@@ -384,7 +389,7 @@ function renderSimu(){
   $("sEcart").textContent = `Écart de ${Math.abs(moi-adv)} points · coefficient ×${fmt(c.coef)}`;
   // objectif
   let tot = 0; compte(j).forEach(m => tot += res(j, m).pts); const virt = j.mens + tot, prox = (classement(virt) + 1)*100, falta = prox - virt;
-  const ex = [-100, 0, 100].map(dlt => { const g = calc(j.mens, j.mens + dlt, true, 1.25).pts; return `<li><b class="num">${Math.ceil(falta/g)}</b> victoire${Math.ceil(falta/g)>1?"s":""} contre un joueur à <span class="num">${j.mens + dlt}</span> pts (critérium, ${fmt(g, true)} chacune)</li>`; }).join("");
+  const ex = [-100, 0, 100].map(dlt => { const g = calc(j.mens, j.mens + dlt, true, COMPS.find(c => c.id === "crit").coef).pts; return `<li><b class="num">${Math.ceil(falta/g)}</b> victoire${Math.ceil(falta/g)>1?"s":""} contre un joueur à <span class="num">${j.mens + dlt}</span> pts (critérium, ${fmt(g, true)} chacune)</li>`; }).join("");
   $("objectif").innerHTML = `<p style="margin:0 0 8px">Il manque <b class="num">${fmt(Math.max(0, falta))}</b> points pour être <b>classé ${prox/100}</b> (${arr(virt)} → ${prox}).</p><ul class="note" style="margin:0;padding-left:18px">${ex}</ul>`;
 }
 function renderGrille(){
@@ -394,7 +399,7 @@ function renderGrille(){
       return `<tr><td class="num">${lbl}</td><td class="pos num">${fmt(t[1], true)}</td><td class="neg num">${fmt(t[2], true)}</td><td class="pos num">${fmt(t[3], true)}</td><td class="neg num">${fmt(t[4], true)}</td></tr>`; }).join("");
   $("coefs").innerHTML = `<tr><th style="text-align:left">Compétition</th><th>Coef.</th></tr>` + COMPS.filter(c => c.id !== "autre").map(c => `<tr><td>${c.nom}</td><td class="num">×${fmt(c.coef)}</td></tr>`).join("");
 }
-function tudo(){ renderJoueurs(); renderAccueil(); renderMatchs(); renderSimu(); renderGrille(); }
+function tudo(){ renderJoueurs(); renderAccueil(); renderMatchs(); renderSimu(); renderGrille(); if (typeof infoPP === "function") infoPP(); }
 
 // ---------------- actions
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
@@ -435,9 +440,10 @@ $("btnJoueur").onclick = () => {
       <div class="field"><label for="jMens">Points mensuels (FFTT)</label><input type="number" id="jMens" inputmode="numeric" value="${j.mens}"></div>
       <div class="field"><label for="jDepuis">Situation du</label><input type="date" id="jDepuis" value="${j.depuis || ""}"></div>
     </div>
-    <p class="hint">Mets les points de la dernière situation mensuelle et sa date : seuls les matchs à partir de cette date comptent dans les virtuels.</p>
+    <div class="field" style="margin-top:10px"><label for="jLic">N° de licence FFTT (mise à jour automatique)</label><input type="text" id="jLic" inputmode="numeric" value="${esc(j.licence || "")}" placeholder="ex. 3541487"></div>
+    <p class="hint">Avec la licence, les points mensuels et les matchs viennent de Ping Pocket. Sans licence : mets les points de la dernière situation mensuelle et sa date ; seuls les matchs à partir de cette date comptent.</p>
     <div class="row-actions"><button class="btn" id="jOk">Enregistrer</button><button class="btn ghost" id="jNovo">+ Nouveau joueur</button><button class="btn danger" id="jDel">Supprimer</button></div>`);
-  $("jOk").onclick = () => { j.nom = $("jNom").value.trim() || j.nom; j.mens = Math.round(parseFloat($("jMens").value) || j.mens); j.depuis = $("jDepuis").value; j.demo = false; sauve(); $("modal").hidden = true; $("sMoi").value = ""; tudo(); };
+  $("jOk").onclick = () => { if (j.demo) j.matchs = []; /* les matchs d'exemple partent */ j.nom = $("jNom").value.trim() || j.nom; j.mens = parseFloat($("jMens").value) || j.mens; j.depuis = $("jDepuis").value; j.licence = $("jLic").value.replace(/\D/g, ""); j.demo = false; sauve(); $("modal").hidden = true; $("sMoi").value = ""; tudo(); if (j.licence) sync(j, true); };
   $("jNovo").onclick = () => { const n = {id:uid(), nom:"Nouveau joueur", mens:500, depuis:hoje().slice(0,8) + "01", matchs:[]}; D.joueurs.push(n); D.actif = n.id; sauve(); tudo(); $("btnJoueur").onclick(); };
   $("jDel").onclick = e => {
     if (e.target.dataset.ok !== "1"){ e.target.dataset.ok = "1"; e.target.textContent = "Confirmer la suppression"; return; }
@@ -536,9 +542,32 @@ $("iPaste").onclick = () => {
   $("fx").onclick = () => $("modal").hidden = true;
 };
 
+// ---------------- mise à jour depuis Ping Pocket (fichier data/<licence>.json, rafraîchi chaque jour par GitHub)
+async function sync(j, avisa){
+  if (!j || !j.licence) return;
+  const info = $("ppInfo"); if (info) info.textContent = "mise à jour…";
+  try {
+    const r = await fetch(`data/${j.licence}.json?t=${Date.now()}`, {cache: "no-store"});
+    if (r.status === 404){ if (info) info.textContent = "licence pas encore suivie (à ajouter dans licences.txt)"; return; }
+    if (!r.ok) throw 0;
+    const d = await r.json();
+    const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:c.coef, epreuve:m.epreuve, adv:"", advPts:null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
+    j.matchs = j.matchs.filter(m => m.src !== "pp").concat(novos);
+    if (d.mensuels) j.mens = d.mensuels;
+    j.pp = {maj: d.maj, classement: d.classement, officielsPhase: d.officielsPhase, lu: Date.now()};
+    j.demo = false; sauve(); tudo();
+  } catch(e){ if (info) info.textContent = "hors ligne : données du " + (j.pp && j.pp.maj ? dataFr(j.pp.maj.slice(0,10)) : "—"); }
+}
+function infoPP(){
+  const j = J(), bar = $("ppBar"); bar.hidden = !j.licence;
+  if (j.licence) $("ppInfo").textContent = j.pp && j.pp.maj ? `Ping Pocket du ${dataFr(j.pp.maj.slice(0,10))} ${j.pp.maj.slice(11,16)} UTC` : "";
+}
+$("ppSync").onclick = () => sync(J(), true);
+
 // démarrage
 opts($("mComp"), "crit"); opts($("sComp"), "crit"); $("mDate").value = hoje();
 tudo();
+{ const j = J(); if (j.licence && (!j.pp || Date.now() - (j.pp.lu || 0) > 3*3600*1000)) sync(j); }
 try { const o = localStorage.getItem(CLE + ".onglet"); if (o) document.querySelector(`nav.tabs button[data-v="${o}"]`)?.click(); } catch(e){}
 })();
 if ("serviceWorker" in navigator) { window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {})); }

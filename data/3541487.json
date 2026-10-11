@@ -1,0 +1,290 @@
+{
+ "licence": "3541487",
+ "maj": "2026-10-11T20:43Z",
+ "classement": 7.0,
+ "mensuels": 764.0,
+ "officielsPhase": 510.0,
+ "progMensuelle": 11.4,
+ "matchs": [
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 7.5,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 6.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 6.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 6.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 6.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 4.5,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 3.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "pts": 3.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-03",
+   "epreuve": "D35_Championnat par équipes Jeunes",
+   "pts": 1.5,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-03",
+   "epreuve": "D35_Championnat par équipes Jeunes",
+   "pts": 1.5,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-03",
+   "epreuve": "D35_Championnat par équipes Jeunes",
+   "pts": 1.5,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-02",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "pts": 3.0,
+   "v": true,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-02",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "pts": 0.0,
+   "v": false,
+   "officiel": false
+  },
+  {
+   "date": "2026-10-02",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "pts": -4.0,
+   "v": false,
+   "officiel": false
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 4.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 3.8,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 3.8,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 2.2,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": -1.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": -3.8,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 5.2,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 4.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": -0.8,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": -1.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "pts": -4.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 16.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": -0.8,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": -1.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-13",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": -5.2,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 7.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 4.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 3.8,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 2.2,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": -3.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": -3.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-12",
+   "epreuve": "FED_TOURNOI_THORIGNE 26/27",
+   "pts": -3.8,
+   "v": false,
+   "officiel": true
+  }
+ ]
+}
