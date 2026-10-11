@@ -16,6 +16,7 @@ pp.time = type("T", (), {"sleep": staticmethod(lambda s: _dorme(min(s, 0.4)))}) 
 ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767"}
 TRAVA = threading.Lock()
 CACHE = {}
+CLAS_F = "/root/ping-virtual-cache/classement_bretagne.json"; CLAS = None
 
 def publica(lic):
     with TRAVA:
@@ -37,6 +38,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST"); self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
     def do_GET(self):
+        if self.path.startswith("/api/classement"): return self.classement()
         m = re.fullmatch(r"/api/joueur/(\d{5,8})/apercu", self.path.split("?")[0])
         if not m: return self.responde(404, {"erreur": "inconnu"})
         lic = m.group(1); c = CACHE.get(lic)
@@ -57,6 +59,23 @@ class H(BaseHTTPRequestHandler):
         except BaseException: return self.responde(502, {"erreur": "Ping Pocket ne répond pas"})
         threading.Thread(target=publica, args=(lic,), daemon=True).start()
         self.responde(200, d)
+    def classement(self):
+        """?cat=Benjamin (prefixo: Benjamin 1 + 2) &sexe=H|F &dep=35 -> lista ordenada pelos pontos mensais"""
+        from urllib.parse import urlparse, parse_qs
+        q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+        global CLAS
+        try:
+            mt = os.path.getmtime(CLAS_F)
+            if CLAS is None or CLAS[0] != mt: CLAS = (mt, json.load(open(CLAS_F)))
+        except OSError: return self.responde(503, {"erreur": "Classement en préparation, réessaie plus tard"})
+        doc = CLAS[1]; cat = q.get("cat", "").lower(); sexe = q.get("sexe", ""); dep = q.get("dep", "")
+        js = [j for j in doc["joueurs"] if (not cat or j["cat"].lower().startswith(cat)) and (not sexe or j["sexe"] == sexe) and (not dep or j["dep"] == dep)]
+        vistos, lista = set(), []
+        for j in sorted(js, key=lambda j: -j["pts"]):
+            if j["lic"] in vistos: continue          # um jogador pode aparecer em 2 clubes (mutacao)
+            vistos.add(j["lic"]); lista.append(j)
+        for i, j in enumerate(lista): j["rang"] = lista[i-1]["rang"] if i and lista[i-1]["pts"] == j["pts"] else i + 1   # ex aequo
+        self.responde(200, {"maj": doc["maj"], "region": doc["region"], "comites": doc["comites"], "total": len(lista), "joueurs": lista})
     def log_message(self, *a): pass
 
 if __name__ == "__main__":

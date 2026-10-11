@@ -75,6 +75,7 @@ h2{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:20px;lett
 .seg button{background:var(--surface2);border:1px solid var(--line);color:var(--ink);padding:11px}
 .seg button.on.w{background:var(--win);border-color:var(--win);color:#fff}
 .seg button.on.l{background:var(--loss);border-color:var(--loss);color:#fff}
+.seg button.on[data-sexe]{background:var(--table);border-color:var(--table);color:#fff}
 .preview{margin-top:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:10px;background:var(--surface2);font-size:14px}
 .preview b{font-family:"Barlow Condensed",sans-serif;font-size:26px}
 .pos{color:var(--win)} .neg{color:var(--loss)}
@@ -109,7 +110,7 @@ table.grille tr.hl td{background:color-mix(in srgb,var(--ball) 14%,transparent)}
 .note{color:var(--muted);font-size:13px;max-width:65ch}
 
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:10;background:var(--surface);border-top:1px solid var(--line);padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px))}
-nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+nav.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);gap:2px}
 nav.tabs button{background:none;color:var(--muted);padding:8px 2px;font-size:12.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px}
 nav.tabs button svg{width:22px;height:22px}
 nav.tabs button.on{color:var(--table)}
@@ -222,6 +223,23 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <div class="card" id="objectif"></div>
   </section>
 
+  <!-- CLASSEMENT -->
+  <section id="v-rang" hidden>
+    <h2>Classement régional</h2>
+    <div class="card">
+      <div class="grid2">
+        <div class="field"><label for="rCat">Catégorie</label><select id="rCat">
+          <option value="Poussin">Poussins</option><option value="Benjamin" selected>Benjamins (1 et 2)</option><option value="Benjamin 1">Benjamins 1</option><option value="Benjamin 2">Benjamins 2</option>
+          <option value="Minime">Minimes</option><option value="Cadet">Cadets</option><option value="Junior">Juniors</option><option value="Sénior">Séniors</option><option value="Vétéran">Vétérans</option><option value="">Toutes</option></select></div>
+        <div class="field"><label for="rDep">Zone</label><select id="rDep"><option value="">Bretagne</option><option value="22">Côtes-d'Armor</option><option value="29">Finistère</option><option value="35">Ille-et-Vilaine</option><option value="56">Morbihan</option></select></div>
+      </div>
+      <div class="field" style="margin-top:10px"><label>Sexe</label><div class="seg" style="grid-template-columns:repeat(3,1fr)"><button type="button" class="on" data-sexe="">Tous</button><button type="button" data-sexe="H">Garçons</button><button type="button" data-sexe="F">Filles</button></div></div>
+    </div>
+    <div id="rResumo" style="margin-top:12px"></div>
+    <div class="card" style="padding:0;margin-top:12px" id="rLista"><div class="empty">Chargement…</div></div>
+    <p class="note" style="margin-top:10px">Classement par points mensuels, d'après les listes des clubs (mis à jour chaque semaine).</p>
+  </section>
+
   <!-- GRILLE -->
   <section id="v-grille" hidden>
     <h2>Grille FFTT (coefficient 1)</h2>
@@ -244,6 +262,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
   <button data-v="accueil" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Points</button>
   <button data-v="matchs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M12 6v12M3 12h18"/></svg>Matchs</button>
   <button data-v="simu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h16M7 16V9M12 16V5M17 16v-4"/></svg>Simuler</button>
+  <button data-v="rang"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/></svg>Rang</button>
   <button data-v="grille"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16v14H4zM4 10h16M4 15h16M10 5v14"/></svg>Grille</button>
 </div></nav>
 
@@ -414,7 +433,8 @@ function tudo(){ renderJoueurs(); renderAccueil(); renderMatchs(); renderSimu();
 // ---------------- actions
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav.tabs button").forEach(x => x.classList.toggle("on", x === b));
-  ["accueil","matchs","simu","grille"].forEach(v => $("v-" + v).hidden = v !== b.dataset.v);
+  ["accueil","matchs","simu","rang","grille"].forEach(v => $("v-" + v).hidden = v !== b.dataset.v);
+  if (b.dataset.v === "rang") carregaRang();
   try { localStorage.setItem(CLE + ".onglet", b.dataset.v); } catch(e){}
   window.scrollTo(0, 0);
 });
@@ -626,6 +646,7 @@ function aplica(j, d){
     if (d.mensuels) j.mens = d.mensuels;
     if (!j.ppInit){ const hj = new Date(); const ano = hj.getMonth() >= 6 ? hj.getFullYear() : hj.getFullYear() - 1; j.depuis = `${ano}-07-01`; j.ppInit = true; }
     j.pp = {maj: d.maj, classement: d.classement, officielsPhase: d.officielsPhase, lu: Date.now()};
+    if (d.categorie) j.categorie = d.categorie;
     j.demo = false;
 }
 function infoPP(){
@@ -633,6 +654,39 @@ function infoPP(){
   if (j.licence) $("ppInfo").textContent = j.pp && j.pp.maj ? `Ping Pocket du ${dataFr(j.pp.maj.slice(0,10))} ${j.pp.maj.slice(11,16)} UTC` : "";
 }
 $("ppSync").onclick = () => sync(J(), true);
+
+// ---------------- classement régional (backoffice: /api/classement)
+let rSexe = "", rUltimo = "";
+function virtJ(j){ let t = 0; compte(j).forEach(m => t += res(j, m).pts); return j.mens + t; }
+async function carregaRang(){
+  const j = J();
+  if (j.categorie && !rUltimo){ const c = j.categorie.replace(/ \d$/, ""); if ([...$("rCat").options].some(o => o.value === c)) $("rCat").value = c; }
+  const q = `cat=${encodeURIComponent($("rCat").value)}&dep=${$("rDep").value}&sexe=${rSexe}`; rUltimo = q;
+  $("rLista").innerHTML = `<div class="empty">Chargement…</div>`; $("rResumo").innerHTML = "";
+  const d = await api(`/classement?${q}`);
+  if (q !== rUltimo) return;
+  if (d.erreur){ $("rLista").innerHTML = `<div class="empty">${esc(d.erreur)}</div>`; return; }
+  const meus = new Set(D.joueurs.map(p => p.licence).filter(Boolean));
+  const eu = d.joueurs.find(x => x.lic === j.licence);
+  const zona = $("rDep").value ? $("rDep").selectedOptions[0].text : "Bretagne";
+  if (eu){
+    const v = virtJ(j), rv = 1 + d.joueurs.filter(x => x.lic !== j.licence && x.pts > v).length;
+    $("rResumo").innerHTML = `<div class="hero" style="padding:16px 18px"><div class="row"><div><div class="lbl">${esc(j.nom)} · ${esc($("rCat").selectedOptions[0].text)} · ${esc(zona)}</div>
+      <div class="big num" style="font-size:54px">${eu.rang}<span style="font-size:26px">e</span> <span style="font-size:22px;font-style:normal;opacity:.85">/ ${d.total}</span></div></div></div>
+      <div class="bar-l" style="margin-top:6px"><span>avec ${fmt(eu.pts)} pts mensuels</span><span>avec ses virtuels (${fmt(Math.round(v*10)/10)}) : <b>${rv}e</b></span></div></div>`;
+  } else if (j.licence) $("rResumo").innerHTML = `<p class="hint">${esc(j.nom)} n'est pas dans cette liste (autre catégorie, sexe ou zone).</p>`;
+  const iEu = eu ? d.joueurs.indexOf(eu) : -1;
+  const mostra = iEu > 300 ? d.joueurs.slice(0, 100).concat([null], d.joueurs.slice(iEu - 30, iEu + 31)) : d.joueurs.slice(0, 400);
+  const linhas = mostra.map(x => x === null ? `<div class="empty" style="padding:8px">⋯</div>` : `<div class="match" ${x.lic === j.licence ? 'id="rEu" style="background:color-mix(in srgb,var(--ball) 16%,transparent)"' : ""}>
+      <div class="res num" style="background:var(--surface2);color:var(--ink);font-size:${x.rang > 99 ? 13 : 16}px">${x.rang}</div>
+      <div class="who"><div>${esc(x.nom)}${meus.has(x.lic) && x.lic !== j.licence ? " ★" : ""}</div><small>${esc(x.club)} · ${esc(x.cat)}</small></div>
+      <div class="pts num">${fmt(x.pts)}</div></div>`).join("");
+  $("rLista").innerHTML = linhas || `<div class="empty">Personne dans cette sélection.</div>`;
+  if (d.joueurs.length > 400 && iEu <= 300) $("rLista").innerHTML += `<div class="empty">… ${d.joueurs.length - 400} autres</div>`;
+  const alvo = $("rEu"); if (alvo) setTimeout(() => alvo.scrollIntoView({block: "center", behavior: "smooth"}), 150);
+}
+["rCat", "rDep"].forEach(id => $(id).addEventListener("change", carregaRang));
+document.querySelectorAll("[data-sexe]").forEach(b => b.onclick = () => { rSexe = b.dataset.sexe; document.querySelectorAll("[data-sexe]").forEach(x => x.classList.toggle("on", x === b)); carregaRang(); });
 
 // démarrage
 opts($("mComp"), "crit"); opts($("sComp"), "crit"); $("mDate").value = hoje();
