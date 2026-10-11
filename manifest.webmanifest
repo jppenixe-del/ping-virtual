@@ -1,6 +1,6 @@
 {
-  "name": "Ping Virtuel — points FFTT",
-  "short_name": "Ping Virtuel",
+  "name": "Ping Virtual — points FFTT",
+  "short_name": "Ping Virtual",
   "description": "Calculateur de points virtuels FFTT : matchs, grille officielle, simulateur.",
   "lang": "fr",
   "start_url": "./",

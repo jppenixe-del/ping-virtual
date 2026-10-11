@@ -1,4 +1,4 @@
-# Ping Virtuel
+# Ping Virtual
 
 Calculateur de **points virtuels FFTT** (tennis de table), installable sur le téléphone (PWA, fonctionne hors ligne).
 
