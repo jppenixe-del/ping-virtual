@@ -1,0 +1,309 @@
+{
+ "licence": "3549606",
+ "maj": "2026-10-11T21:34Z",
+ "classement": 7.0,
+ "mensuels": 726.0,
+ "officielsPhase": 522.0,
+ "progMensuelle": 24.5,
+ "nom": "LEDOS Arthur",
+ "categorie": "Benjamin 1",
+ "club": "THORIGNE-FOUILLARD T.T.",
+ "matchs": [
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "LARTIGUE Robin",
+   "pts": 10.5,
+   "v": true,
+   "officiel": false,
+   "advPts": 766.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "MEMPONTEL Antoine",
+   "pts": 9.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 717.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "PRUDHOMME Jules",
+   "pts": 9.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 708.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "MASSELIN Marius",
+   "pts": -0.75,
+   "v": false,
+   "officiel": false,
+   "advPts": 1032.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "MARIE Maxence",
+   "pts": -0.75,
+   "v": false,
+   "officiel": false,
+   "advPts": 1044.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "LIBERT TOULOUSE Robin",
+   "pts": -4.5,
+   "v": false,
+   "officiel": false,
+   "advPts": 841.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "SCHMUTZ Soren",
+   "pts": -4.5,
+   "v": false,
+   "officiel": false,
+   "advPts": 835.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "PEAN Maël",
+   "pts": -4.5,
+   "v": false,
+   "officiel": false,
+   "advPts": 836.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-11",
+   "epreuve": "FED_Critérium Fédéral",
+   "adv": "PRUDHOMME Jules",
+   "pts": -7.5,
+   "v": false,
+   "officiel": false,
+   "advPts": 708.0,
+   "coef": 1.5
+  },
+  {
+   "date": "2026-10-03",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "ETHORE Emmanuel",
+   "pts": 10.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 862.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-03",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "SPENLE Kevin",
+   "pts": 6.0,
+   "v": true,
+   "officiel": false,
+   "advPts": 726.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-10-03",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "ELARD Stéphane",
+   "pts": -3.0,
+   "v": false,
+   "officiel": false,
+   "advPts": 856.0,
+   "coef": 1.0
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "SAVIGNAN Antoine",
+   "pts": 5.25,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "BEHIER Maelig",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "MORANT François",
+   "pts": 0.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "BRIELLES Robin",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "HAMEL Elwann",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "IMMELE Jocelyn",
+   "pts": -3.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-27",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "BREMONT Charles",
+   "pts": -3.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "ABERGEL Jonah",
+   "pts": 7.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "LANZERE Titouan",
+   "pts": 2.25,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "GUILLAUME Benjamin",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "BRIELLES Robin",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "CHOUCQ Léo",
+   "pts": -2.25,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-26",
+   "epreuve": "FED_TOURNOI_VERN SUR SEICHE 26/27",
+   "adv": "HOUYERE Melvin",
+   "pts": -3.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-19",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "JEGOUREL Jean-philippe",
+   "pts": -0.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-19",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "HALET Michel",
+   "pts": -4.5,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-19",
+   "epreuve": "FED_Championnat de France par Equipes Masculin",
+   "adv": "HAMARD Louis",
+   "pts": -5.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-06",
+   "epreuve": "FED_TOURNOI_CABOURG 26/27",
+   "adv": "LEFEVRE Christophe",
+   "pts": 4.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-06",
+   "epreuve": "FED_TOURNOI_CABOURG 26/27",
+   "adv": "CREPIN Gregory",
+   "pts": 3.0,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-06",
+   "epreuve": "FED_TOURNOI_CABOURG 26/27",
+   "adv": "GERAY Philippe",
+   "pts": 1.5,
+   "v": true,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-06",
+   "epreuve": "FED_TOURNOI_CABOURG 26/27",
+   "adv": "GILLES Maxence",
+   "pts": -0.75,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-06",
+   "epreuve": "FED_TOURNOI_CABOURG 26/27",
+   "adv": "AARAGE Damien",
+   "pts": -3.0,
+   "v": false,
+   "officiel": true
+  },
+  {
+   "date": "2026-09-06",
+   "epreuve": "FED_TOURNOI_CABOURG 26/27",
+   "adv": "BENETIERE Guy",
+   "pts": -3.75,
+   "v": false,
+   "officiel": true
+  }
+ ]
+}
