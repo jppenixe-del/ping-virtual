@@ -16,7 +16,7 @@ def get(url, essais=4):
             with urllib.request.urlopen(req, timeout=60) as r:
                 return r.read().decode("utf-8", "replace")
         except Exception as e:
-            print("essai", k + 1, url, e, file=sys.stderr); time.sleep(10*(k + 1))
+            print("essai", k + 1, url, e, file=sys.stderr); time.sleep(5)   # 504: a Ping Pocket continua a calcular e guarda; a tentativa seguinte e' rapida
     raise SystemExit("Ping Pocket ne répond pas: " + url)
 
 def conserta(s):

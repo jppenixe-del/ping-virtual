@@ -9,7 +9,7 @@ try:
     vistos = set()
     for j in sorted((j for j in c["joueurs"] if j["cat"].lower().startswith("benjamin") and not j.get("loisir")), key=lambda j: -j["pts"]):
         if j["lic"] not in vistos: vistos.add(j["lic"]); lics.append(j["lic"])
-        if len(lics) >= 60: break
+        if len(lics) >= 400: break      # todos os Benjamins com pontos (~350)
 except OSError: pass
 for f in glob.glob(f"{REPO}/data/[0-9]*.json"):
     for m in json.load(open(f))["matchs"]:
@@ -17,7 +17,7 @@ for f in glob.glob(f"{REPO}/data/[0-9]*.json"):
 feitas = 0
 for lic in lics:
     fx = f"{CACHE}/fiches/{lic}.json"
-    if os.path.exists(fx) and time.time() - os.path.getmtime(fx) < 6*3600: continue
+    if os.path.exists(fx) and time.time() - os.path.getmtime(fx) < 20*3600: continue
     try: os.remove(fx)                       # obriga a recalcular
     except OSError: pass
     try:
