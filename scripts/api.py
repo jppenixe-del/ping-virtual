@@ -18,7 +18,8 @@ pp.time = type("T", (), {"sleep": staticmethod(lambda s: _dorme(min(s, 0.4)))}) 
 ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767"}
 TRAVA = threading.Lock()
 CACHE = {}
-FICHAS = {}; ADV = {}
+ADV = {}; EM_CURSO = set()
+FICHAS_D = "/root/ping-virtual-cache/fiches"
 CLAS_F = "/root/ping-virtual-cache/classement_bretagne.json"; CLAS = None
 TOPV_F = "/root/ping-virtual-cache/top_virtuel.json"
 
@@ -29,6 +30,24 @@ def publica(lic):
             && git add licences.txt data && (git diff --cached --quiet || git -c user.name=ping-virtual-bot
             -c user.email=ping-virtual-bot@users.noreply.github.com commit -qm 'Ajout de la licence {lic}')
             && git pull -q --rebase --autostash && git push -q"""], timeout=120)
+
+def calcula_ficha(lic):
+    try:
+        with TRAVA:
+            f = pp.fiche(lic)
+            if not f.get("nom") or f.get("mensuels") is None: return {"erreur": "Licence introuvable"}
+            ms = pp.completa(pp.matchs(lic), f.get("mensuels"), ADV)
+    except BaseException: return {"erreur": "Ping Pocket ne répond pas"}
+    mens = f.get("mensuels") or 0; val = sum(m["pts"] for m in ms if m["officiel"]); ref = mens + val; pend = 0.0
+    for m in ms:
+        if m["officiel"]: continue
+        m["ptsVirt"] = pp.base(ref, m["advPts"], m["v"])*m.get("coef", 1) if m.get("advPts") is not None and m.get("v") is not None else m["pts"]
+        pend += m["ptsVirt"]
+    r = {"licence": lic, **f, "valides": val, "attente": pend, "virtuels": round(ref + pend, 2), "matchs": ms,
+         "suivi": os.path.exists(f"data/{lic}.json")}
+    os.makedirs(FICHAS_D, exist_ok=True)
+    tmp = f"{FICHAS_D}/{lic}.json.tmp"; json.dump(r, open(tmp, "w"), ensure_ascii=False); os.replace(tmp, f"{FICHAS_D}/{lic}.json")
+    return r
 
 class H(BaseHTTPRequestHandler):
     def cors(self):
@@ -99,24 +118,17 @@ class H(BaseHTTPRequestHandler):
         for i, j in enumerate(js): j["rang"] = i + 1; j["pts"] = j["virtuels"]
         self.responde(200, {"maj": doc["maj"], "total": len(js), "virtuel": True, "joueurs": js})
     def ficha(self, lic):
-        """ficha de um jogador qualquer: dados + jogos + virtuais (cache 30 min); nao passa a segui-lo"""
-        c = FICHAS.get(lic)
-        if c and time.time() - c[0] < 1800: return self.responde(200, c[1])
-        try:
-            with TRAVA:
-                f = pp.fiche(lic)
-                if not f.get("nom") or f.get("mensuels") is None: return self.responde(404, {"erreur": "Licence introuvable"})
-                ms = pp.completa(pp.matchs(lic), f.get("mensuels"), ADV)
-        except BaseException: return self.responde(502, {"erreur": "Ping Pocket ne répond pas"})
-        mens = f.get("mensuels") or 0; val = sum(m["pts"] for m in ms if m["officiel"]); ref = mens + val; pend = 0.0
-        for m in ms:
-            if m["officiel"]: continue
-            if m.get("advPts") is not None and m.get("v") is not None: m["ptsVirt"] = pp.base(ref, m["advPts"], m["v"])*m.get("coef", 1)
-            else: m["ptsVirt"] = m["pts"]
-            pend += m["ptsVirt"]
-        r = {"licence": lic, **f, "valides": val, "attente": pend, "virtuels": round(ref + pend, 2), "matchs": ms,
-             "suivi": os.path.exists(f"data/{lic}.json")}
-        FICHAS[lic] = (time.time(), r); self.responde(200, r)
+        """ficha de um jogador qualquer: dados + jogos + virtuais. Guardada em disco: fresca (< 12 h) devolve-se logo;
+        mais velha devolve-se tambem logo (marcada) e refaz-se em segundo plano"""
+        fx = f"{FICHAS_D}/{lic}.json"
+        if os.path.exists(fx):
+            idade = time.time() - os.path.getmtime(fx)
+            r = json.load(open(fx)); r["idade_h"] = round(idade/3600, 1)
+            if idade > 12*3600 and lic not in EM_CURSO:
+                EM_CURSO.add(lic); threading.Thread(target=lambda: (calcula_ficha(lic), EM_CURSO.discard(lic)), daemon=True).start()
+            return self.responde(200, r)
+        r = calcula_ficha(lic)
+        self.responde(200 if "erreur" not in r else (404 if r["erreur"] == "Licence introuvable" else 502), r)
     def maj(self, lic):
         """atualizacao imediata de um favorito (botao da app): dados frescos da Ping Pocket; nao repete se < 10 min"""
         f = f"data/{lic}.json"

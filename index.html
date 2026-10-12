@@ -252,7 +252,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <h2>Coefficients</h2>
     <div class="card tablewrap"><table class="grille" id="coefs"></table></div>
     <p class="note" style="margin-top:12px">Les coefficients peuvent changer d'une saison à l'autre : en cas de doute, choisis « Autre » et saisis le coefficient indiqué par la FFTT. Résultat officiel : seule la situation mensuelle FFTT fait foi.</p>
-    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-15</span></p>
+    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-16</span></p>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Les données restent sur ce téléphone. Exporte-les pour les garder ou les passer sur un autre appareil.</p>
@@ -644,6 +644,7 @@ async function sync(j, avisa){
   } catch(e){ if (info) info.textContent = "hors ligne : données du " + (j.pp && j.pp.maj ? dataFr(j.pp.maj.slice(0,10)) : "—"); }
 }
 function aplica(j, d){
+    d.matchs.forEach(m => { if (m.advLic && !INFO[m.advLic]) INFO[m.advLic] = {nom: m.adv, pts: m.advPts}; });
     const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:m.coef || c.coef, epreuve:m.epreuve, adv:m.adv || "", advLic:m.advLic || "", advPts:m.advPts ?? null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
     j.matchs = j.matchs.filter(m => m.src !== "pp").concat(novos);
     if (d.mensuels) j.mens = d.mensuels;
@@ -695,6 +696,7 @@ async function carregaRang(){
       <div class="big num" style="font-size:54px">${eu.rang}<span style="font-size:26px">e</span> <span style="font-size:22px;font-style:normal;opacity:.85">/ ${d.total}</span></div></div></div>
       <div class="bar-l" style="margin-top:6px"><span>avec ${fmt(eu.pts)} pts mensuels</span><span>virtuels ${fmt(Math.round(v*10)/10)} → voir « Virtuels (top) »</span></div></div>`;
   } else if (j.licence) $("rResumo").innerHTML = `<p class="hint">${esc(j.nom)} n'est pas dans cette liste (autre catégorie, sexe ou zone).</p>`;
+  d.joueurs.forEach(x => INFO[x.lic] = {nom: x.nom, club: x.club, cat: x.cat, pts: x.mensuels ?? x.pts});
   const iEu = eu ? d.joueurs.indexOf(eu) : -1;
   const mostra = iEu > 300 ? d.joueurs.slice(0, 100).concat([null], d.joueurs.slice(iEu - 30, iEu + 31)) : d.joueurs.slice(0, 400);
   const linhas = mostra.map(x => x === null ? `<div class="empty" style="padding:8px">⋯</div>` : `<div class="match" data-fiche="${x.lic}" style="cursor:pointer" ${x.lic === j.licence ? 'id="rEu" style="cursor:pointer;background:color-mix(in srgb,var(--ball) 16%,transparent)"' : ""}>
@@ -710,16 +712,22 @@ document.querySelectorAll("[data-modo]").forEach(b => b.onclick = () => { rModo 
 document.querySelectorAll("[data-sexe]").forEach(b => b.onclick = () => { rSexe = b.dataset.sexe; document.querySelectorAll("[data-sexe]").forEach(x => x.classList.toggle("on", x === b)); carregaRang(); });
 
 // ---------------- fiche d'un joueur (toucher un nom): données, virtuels, derniers matchs, favori
+const INFO = {};   // o que ja' se sabe de cada jogador (lista do ranking, adversarios): a ficha abre logo com isto
 async function abreFicha(lic){
   modal(`<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Fiche joueur</h2><button class="icon-btn" id="fFecha" aria-label="Fermer">✕</button></div>
-    <p class="hint" id="fEst">Chargement… (Ping Pocket peut mettre jusqu'à une minute)</p><div id="fCorpo"></div>`);
+    ${INFO[lic] ? `<div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-style:italic;font-size:26px;margin-top:8px">${esc(INFO[lic].nom)}</div>
+      <div class="hint" style="margin-top:0">${esc(INFO[lic].club || "")}${INFO[lic].cat ? " · " + esc(INFO[lic].cat) : ""}${INFO[lic].pts != null ? ` · <b class="num">${fmt(INFO[lic].pts)}</b> pts` : ""}</div>` : ""}
+    <p class="hint" id="fEst">Chargement des matchs…</p><div id="fCorpo"></div>`);
+  const lento = setTimeout(() => { if ($("fEst") && $("fEst").textContent.startsWith("Chargement")) $("fEst").textContent = "Chargement des matchs… (Ping Pocket est lent, jusqu'à une minute)"; }, 4000);
   $("fFecha").onclick = () => $("modal").hidden = true;
-  const d = await api(`/joueur/${lic}/fiche`);
+  const d = await api(`/joueur/${lic}/fiche`); clearTimeout(lento);
   if ($("modal").hidden || !$("fCorpo")) return;
+  $("modalBody").querySelectorAll(":scope > div[style*='Barlow'], :scope > div.hint").forEach(e => e.remove());
   if (d.erreur){ $("fEst").textContent = d.erreur; return; }
   $("fEst").textContent = "";
   const fav = D.joueurs.find(p => p.licence === lic);
   let v = 0, dd = 0; d.matchs.forEach(m => m.v ? v++ : m.v === false && dd++);
+  d.matchs.forEach(m => { if (m.advLic && !INFO[m.advLic]) INFO[m.advLic] = {nom: m.adv, pts: m.advPts}; });
   const ult = d.matchs.slice(0, 15).map(m => { const p = m.officiel ? m.pts : (m.ptsVirt ?? m.pts);
     return `<div class="match"><div class="res ${m.v ? "w" : "l"}">${m.v ? "V" : m.v === false ? "D" : "·"}</div>
       <div class="who"><div ${m.advLic ? `data-fiche="${m.advLic}" style="cursor:pointer;text-decoration:underline dotted"` : ""}>${esc(m.adv || "—")}${m.advPts != null ? ` <small class="num">· ${fmt(m.advPts)} pts</small>` : ""}</div>
