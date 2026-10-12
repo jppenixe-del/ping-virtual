@@ -73,7 +73,9 @@ class H(BaseHTTPRequestHandler):
         except OSError: return self.responde(503, {"erreur": "Classement en préparation, réessaie plus tard"})
         doc = CLAS[1]; cat = q.get("cat", "").lower(); sexe = q.get("sexe", ""); dep = q.get("dep", "")
         if q.get("mode") == "virtuel": return self.top_virtuel(cat, sexe, dep)
-        js = [j for j in doc["joueurs"] if (not cat or j["cat"].lower().startswith(cat)) and (not sexe or j["sexe"] == sexe) and (not dep or j["dep"] == dep)]
+        loisir = q.get("loisir") == "1"
+        js = [j for j in doc["joueurs"] if (not cat or j["cat"].lower().startswith(cat)) and (not sexe or j["sexe"] == sexe) and (not dep or j["dep"] == dep)
+              and (loisir or not j.get("loisir"))]
         vistos, lista = set(), []
         for j in sorted(js, key=lambda j: -j["pts"]):
             if j["lic"] in vistos: continue          # um jogador pode aparecer em 2 clubes (mutacao)

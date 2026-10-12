@@ -26,10 +26,17 @@ def jogadores(cid, clube, ct):
         lic = re.search(r'href="/app/fftt/licencies/(\d+)', b); nome = re.search(r'<div class="labels">\s*<p>([^<]*)</p>', b)
         pts = re.search(r'<small class="counter[^"]*">([^<]*)</small>', b)
         if not (lic and nome and pts): continue
-        p = pp.num(pts.group(1))
-        if p is None: continue            # "L": licence loisir, sem pontos
+        bruto = pts.group(1).strip()
+        if re.fullmatch(r"N\d+", bruto):        # numerotes (top nacional): a lista mostra "N25", nao os pontos
+            try: p = pp.fiche(lic.group(1)).get("mensuels"); time.sleep(1.5)
+            except SystemExit: p = None
+            if p is None: continue
+            bruto = str(p)
+        p = pp.num(bruto); loisir = p is None and bruto == "L"
+        if p is None and not loisir: continue
         out.append({"lic": lic.group(1), "nom": pp.conserta(html.unescape(nome.group(1)).strip()), "cat": cat,
-                    "sexe": "F" if "fa-female" in b else "H", "pts": p, "club": clube, "dep": ct})
+                    "sexe": "F" if "fa-female" in b else "H", "pts": 500.0 if loisir else p, "club": clube, "dep": ct,
+                    **({"loisir": True} if loisir else {})})   # licence loisir: 500 pontos fixos, nao joga competicao
     return out
 
 def main():
