@@ -79,14 +79,14 @@ a{color:var(--table)}
         <div id="rAlt"><span>Hauteur du lancer</span><b class="num" id="vAlt">—</b><span id="tAlt"></span></div>
         <div id="rAng"><span>Angle / verticale</span><b class="num" id="vAng">—</b><span id="tAng"></span></div>
       </div>
-      <div class="row" style="margin-top:10px"><button class="btn" id="guardar">Enregistrer ce service</button><span class="hint">Tolérance d'angle :</span><input type="number" id="tol" value="20" min="5" max="45" style="width:70px"><span class="hint">°</span></div>
+      <div class="row" style="margin-top:10px"><button class="btn" id="guardar">Enregistrer ce service</button><span class="hint">Tolérance d'angle :</span><input type="number" id="tol" value="30" min="5" max="45" style="width:70px"><span class="hint">°</span></div>
     </div>
   </div>
 
   <h2>Séance</h2>
   <div class="card"><div id="resumo" class="hint">Aucun service enregistré.</div><table class="hist" id="hist"></table>
     <div class="row" style="margin-top:8px"><button class="btn ghost" id="limpar">Nouvelle séance</button></div></div>
-  <p class="hint" style="margin-top:14px">Conseils : caméra à hauteur de la main, perpendiculaire au lancer, fond uni et balle orange si possible. L'angle « presque vertical » n'a pas de valeur chiffrée dans le règlement : la tolérance se règle ci-dessus.</p>
+  <p class="hint" style="margin-top:14px">Conseils : caméra à hauteur de la main, perpendiculaire au lancer, fond uni et balle orange si possible. L'arbitrage vidéo (TTR) accepte jusqu'à 30° par rapport à la verticale : c'est la tolérance par défaut, réglable ci-dessus.</p>
 </div>
 
 <script>
@@ -207,7 +207,7 @@ async function segue(p){
 function mostraResultado(){
   fase = 2; texto(); desenha();
   const dy = (soltura.y - topo.y)*escala, dx = Math.abs(topo.x - soltura.x)*escala;
-  const ang = Math.atan2(dx, dy)*180/Math.PI, tol = parseFloat($("tol").value) || 20;
+  const ang = Math.atan2(dx, dy)*180/Math.PI, tol = parseFloat($("tol").value) || 30;
   ULTIMO = {alt: dy, ang};
   $("vAlt").textContent = `${fmt(dy)} cm`; $("vAng").textContent = `${fmt(ang)}°`;
   const okA = dy >= 16, okG = ang <= tol;
@@ -223,7 +223,7 @@ const CLE = "pingvirtual.services";
 function hist(){ try { return JSON.parse(localStorage.getItem(CLE)) || []; } catch(e){ return []; } }
 function guarda(h){ try { localStorage.setItem(CLE, JSON.stringify(h)); } catch(e){} }
 function mostraHist(){
-  const h = hist(), tol = parseFloat($("tol").value) || 20;
+  const h = hist(), tol = parseFloat($("tol").value) || 30;
   if (!h.length){ $("resumo").textContent = "Aucun service enregistré."; $("hist").innerHTML = ""; return; }
   const bons = h.filter(s => s.alt >= 16 && s.ang <= tol).length;
   const media = (k) => fmt(h.reduce((a, s) => a + s[k], 0)/h.length);
