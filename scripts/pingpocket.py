@@ -81,7 +81,7 @@ def completa(ms, mens, vistos=None):
     e o coeficiente da prova deduzido dos pontos mostrados pela Ping Pocket (calculados com os pontos mensais)."""
     vistos = {} if vistos is None else vistos     # cache dos pontos dos adversarios (partilhada entre jogadores)
     for m in ms:
-        lic = m.pop("_lic", "")
+        lic = m.get("_lic", "")
         if m["officiel"] or not lic or not mens: continue
         if lic not in vistos:
             f = fiche(lic); vistos[lic] = f.get("mensuels"); time.sleep(3)
@@ -91,7 +91,9 @@ def completa(ms, mens, vistos=None):
         if m["v"] is None: m["v"] = adv < mens          # 0 pontos: o favorito ganhou
         b = base(mens, adv, m["v"])
         if b: m["coef"] = round(m["pts"]/b, 3)
-    for m in ms: m.pop("_lic", None)
+    for m in ms:
+        l = m.pop("_lic", None)
+        if l: m["advLic"] = l
     return ms
 
 def indice():

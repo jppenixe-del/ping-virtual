@@ -252,7 +252,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <h2>Coefficients</h2>
     <div class="card tablewrap"><table class="grille" id="coefs"></table></div>
     <p class="note" style="margin-top:12px">Les coefficients peuvent changer d'une saison à l'autre : en cas de doute, choisis « Autre » et saisis le coefficient indiqué par la FFTT. Résultat officiel : seule la situation mensuelle FFTT fait foi.</p>
-    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-13</span></p>
+    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-14</span></p>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Les données restent sur ce téléphone. Exporte-les pour les garder ou les passer sur un autre appareil.</p>
@@ -389,7 +389,7 @@ function jours(j, ms, apagar){
     const linhas = gr.ms.map(m => { const r = res(j, m); const tag = r.type === "VA" ? `<span class="tag perf">perf</span>` : r.type === "DA" ? `<span class="tag contre">contre</span>` : "";
       const fora = j.depuis && m.date < j.depuis;
       return `<div class="match"><div class="res ${m.v?"w":"l"}">${m.v?"V":m.v===false?"D":"·"}</div>
-        <div class="who"><div>${esc(m.adv || (m.src === "pp" ? (m.v === false ? "Défaite" : m.v ? "Victoire" : "Match") : "Adversaire"))}${m.advPts != null ? ` <small class="num">· ${m.advPts} pts</small>` : ""}</div><small>${m.src === "pp" ? esc(m.epreuve || "") + (r.ecart != null ? " · " + LIB[r.type] + " · écart " + Math.round(r.ecart) + " · ×" + fmt(m.coef) : "") : LIB[r.type] + " · écart " + r.ecart}${m.comp==="autre" && m.src !== "pp" ? " · ×"+fmt(m.coef) : ""} ${tag}${fora ? " · déjà dans les points mensuels" : m.src === "pp" ? (m.officiel ? " · validé FFTT" : " · en attente") : ""}</small></div>
+        <div class="who"><div ${m.advLic ? `data-fiche="${m.advLic}" style="cursor:pointer;text-decoration:underline dotted"` : ""}>${esc(m.adv || (m.src === "pp" ? (m.v === false ? "Défaite" : m.v ? "Victoire" : "Match") : "Adversaire"))}${m.advPts != null ? ` <small class="num">· ${m.advPts} pts</small>` : ""}</div><small>${m.src === "pp" ? esc(m.epreuve || "") + (r.ecart != null ? " · " + LIB[r.type] + " · écart " + Math.round(r.ecart) + " · ×" + fmt(m.coef) : "") : LIB[r.type] + " · écart " + r.ecart}${m.comp==="autre" && m.src !== "pp" ? " · ×"+fmt(m.coef) : ""} ${tag}${fora ? " · déjà dans les points mensuels" : m.src === "pp" ? (m.officiel ? " · validé FFTT" : " · en attente") : ""}</small></div>
         <div><div class="pts ${r.pts>0?"pos":r.pts<0?"neg":""}">${fmt(r.pts, true)}</div>${apagar ? `<button class="del" data-del="${m.id}">supprimer</button>` : ""}</div></div>`; }).join("");
     return `<div class="day"><div class="day-h"><strong>${nomComp(gr.comp)}</strong><small class="num">${dataFr(gr.date)} · <span class="${s>=0?"pos":"neg"}">${fmt(s, true)}</span></small></div><div class="card" style="padding:0">${linhas}</div></div>`;
   }).join("");
@@ -644,7 +644,7 @@ async function sync(j, avisa){
   } catch(e){ if (info) info.textContent = "hors ligne : données du " + (j.pp && j.pp.maj ? dataFr(j.pp.maj.slice(0,10)) : "—"); }
 }
 function aplica(j, d){
-    const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:m.coef || c.coef, epreuve:m.epreuve, adv:m.adv || "", advPts:m.advPts ?? null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
+    const novos = d.matchs.map(m => { const c = compDe(m.epreuve, ""); return {id:uid(), src:"pp", date:m.date, comp:c.comp, coef:m.coef || c.coef, epreuve:m.epreuve, adv:m.adv || "", advLic:m.advLic || "", advPts:m.advPts ?? null, v:m.v, ptsFixe:m.pts, officiel:m.officiel}; });
     j.matchs = j.matchs.filter(m => m.src !== "pp").concat(novos);
     if (d.mensuels) j.mens = d.mensuels;
     if (!j.ppInit){ const hj = new Date(); const ano = hj.getMonth() >= 6 ? hj.getFullYear() : hj.getFullYear() - 1; j.depuis = `${ano}-07-01`; j.ppInit = true; }
@@ -686,7 +686,7 @@ async function carregaRang(){
   } else if (j.licence) $("rResumo").innerHTML = `<p class="hint">${esc(j.nom)} n'est pas dans cette liste (autre catégorie, sexe ou zone).</p>`;
   const iEu = eu ? d.joueurs.indexOf(eu) : -1;
   const mostra = iEu > 300 ? d.joueurs.slice(0, 100).concat([null], d.joueurs.slice(iEu - 30, iEu + 31)) : d.joueurs.slice(0, 400);
-  const linhas = mostra.map(x => x === null ? `<div class="empty" style="padding:8px">⋯</div>` : `<div class="match" ${x.lic === j.licence ? 'id="rEu" style="background:color-mix(in srgb,var(--ball) 16%,transparent)"' : ""}>
+  const linhas = mostra.map(x => x === null ? `<div class="empty" style="padding:8px">⋯</div>` : `<div class="match" data-fiche="${x.lic}" style="cursor:pointer" ${x.lic === j.licence ? 'id="rEu" style="cursor:pointer;background:color-mix(in srgb,var(--ball) 16%,transparent)"' : ""}>
       <div class="res num" style="background:var(--surface2);color:var(--ink);font-size:${x.rang > 99 ? 13 : 16}px">${x.rang}</div>
       <div class="who"><div>${esc(x.nom)}${meus.has(x.lic) && x.lic !== j.licence ? " ★" : ""}</div><small>${esc(x.club)} · ${esc(x.cat)}${x.loisir ? " · loisir" : ""}${d.virtuel ? ` · mensuels ${fmt(x.mensuels)}` : ""}</small></div>
       <div class="pts num">${d.virtuel ? fmt(Math.round(x.pts*10)/10) : fmt(x.pts)}${d.virtuel ? `<div style="font-size:13px" class="${x.virtuels - x.mensuels >= 0 ? "pos" : "neg"}">${fmt(Math.round((x.virtuels - x.mensuels)*10)/10, true)}</div>` : ""}</div></div>`).join("");
@@ -697,6 +697,43 @@ async function carregaRang(){
 ["rCat", "rDep", "rLoisir"].forEach(id => $(id).addEventListener("change", carregaRang));
 document.querySelectorAll("[data-modo]").forEach(b => b.onclick = () => { rModo = b.dataset.modo; document.querySelectorAll("[data-modo]").forEach(x => x.classList.toggle("on", x === b)); carregaRang(); });
 document.querySelectorAll("[data-sexe]").forEach(b => b.onclick = () => { rSexe = b.dataset.sexe; document.querySelectorAll("[data-sexe]").forEach(x => x.classList.toggle("on", x === b)); carregaRang(); });
+
+// ---------------- fiche d'un joueur (toucher un nom): données, virtuels, derniers matchs, favori
+async function abreFicha(lic){
+  modal(`<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Fiche joueur</h2><button class="icon-btn" id="fFecha" aria-label="Fermer">✕</button></div>
+    <p class="hint" id="fEst">Chargement… (Ping Pocket peut mettre jusqu'à une minute)</p><div id="fCorpo"></div>`);
+  $("fFecha").onclick = () => $("modal").hidden = true;
+  const d = await api(`/joueur/${lic}/fiche`);
+  if ($("modal").hidden || !$("fCorpo")) return;
+  if (d.erreur){ $("fEst").textContent = d.erreur; return; }
+  $("fEst").textContent = "";
+  const fav = D.joueurs.find(p => p.licence === lic);
+  let v = 0, dd = 0; d.matchs.forEach(m => m.v ? v++ : m.v === false && dd++);
+  const ult = d.matchs.slice(0, 15).map(m => { const p = m.officiel ? m.pts : (m.ptsVirt ?? m.pts);
+    return `<div class="match"><div class="res ${m.v ? "w" : "l"}">${m.v ? "V" : m.v === false ? "D" : "·"}</div>
+      <div class="who"><div ${m.advLic ? `data-fiche="${m.advLic}" style="cursor:pointer;text-decoration:underline dotted"` : ""}>${esc(m.adv || "—")}${m.advPts != null ? ` <small class="num">· ${fmt(m.advPts)} pts</small>` : ""}</div>
+      <small>${dataFr(m.date)} · ${esc(m.epreuve)}${m.officiel ? " · validé" : " · en attente"}</small></div>
+      <div class="pts num ${p > 0 ? "pos" : p < 0 ? "neg" : ""}">${fmt(Math.round(p*100)/100, true)}</div></div>`; }).join("");
+  $("fCorpo").innerHTML = `
+    <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-style:italic;font-size:26px;margin-top:8px">${esc(d.nom)}</div>
+    <div class="hint" style="margin-top:0">${esc(d.club || "")}${d.categorie ? " · " + esc(d.categorie) : ""} · licence ${lic}</div>
+    <div class="sim-out" style="grid-template-columns:repeat(3,1fr)">
+      <div style="background:var(--surface2)"><span>Mensuels</span><b class="num">${fmt(d.mensuels)}</b><span>classé ${d.classement ?? "—"}</span></div>
+      <div class="w"><span>Virtuels</span><b class="num">${fmt(Math.round(d.virtuels*10)/10)}</b><span class="${d.virtuels >= d.mensuels ? "pos" : "neg"}">${fmt(Math.round((d.virtuels - d.mensuels)*10)/10, true)}</span></div>
+      <div style="background:var(--surface2)"><span>Bilan</span><b class="num">${v}-${dd}</b><span>${d.matchs.length} matchs</span></div>
+    </div>
+    <div class="row-actions">${fav ? `<button class="btn" id="fAbre">Ouvrir le profil</button>` : `<button class="btn" id="fFav">★ Ajouter aux favoris</button>`}</div>
+    <h2 style="font-size:17px">Derniers matchs</h2>
+    <div class="card" style="padding:0">${ult || `<div class="empty">Aucun match cette saison.</div>`}</div>`;
+  if (fav) $("fAbre").onclick = () => { D.actif = fav.id; sauve(); tudo(); $("modal").hidden = true; };
+  else $("fFav").onclick = async () => {
+    $("fFav").disabled = true; $("fFav").textContent = "Ajout…";
+    let g = d.suivi ? await lerJson(`data/${lic}.json`) : null;
+    if (!g){ g = await api(`/joueur/${lic}`, "POST"); if (g.erreur){ $("fFav").textContent = g.erreur; return; } }
+    criaPerfil(lic, g); $("modal").hidden = true;
+  };
+}
+document.addEventListener("click", e => { const t = e.target.closest("[data-fiche]"); if (t){ e.preventDefault(); abreFicha(t.dataset.fiche); } });
 
 // démarrage
 opts($("mComp"), "crit"); opts($("sComp"), "crit"); $("mDate").value = hoje();

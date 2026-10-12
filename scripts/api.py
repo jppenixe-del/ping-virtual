@@ -10,12 +10,15 @@ REPO = "/root/ping-virtual"
 sys.path.insert(0, REPO + "/scripts")
 os.chdir(REPO)
 import pingpocket as pp
+_get = pp.get
+pp.get = lambda u, essais=2: _get(u, essais)       # pedidos interativos: no maximo 2 tentativas
 _dorme = time.sleep
 pp.time = type("T", (), {"sleep": staticmethod(lambda s: _dorme(min(s, 0.4)))})   # pedidos seguidos (um de cada vez), sem as pausas longas do cron
 
 ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767"}
 TRAVA = threading.Lock()
 CACHE = {}
+FICHAS = {}; ADV = {}
 CLAS_F = "/root/ping-virtual-cache/classement_bretagne.json"; CLAS = None
 TOPV_F = "/root/ping-virtual-cache/top_virtuel.json"
 
@@ -42,6 +45,8 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
     def do_GET(self):
         if self.path.startswith("/api/classement"): return self.classement()
+        mf = re.fullmatch(r"/api/joueur/(\d{5,8})/fiche", self.path.split("?")[0])
+        if mf: return self.ficha(mf.group(1))
         m = re.fullmatch(r"/api/joueur/(\d{5,8})/apercu", self.path.split("?")[0])
         if not m: return self.responde(404, {"erreur": "inconnu"})
         lic = m.group(1); c = CACHE.get(lic)
@@ -91,6 +96,25 @@ class H(BaseHTTPRequestHandler):
         js.sort(key=lambda j: -j["virtuels"])
         for i, j in enumerate(js): j["rang"] = i + 1; j["pts"] = j["virtuels"]
         self.responde(200, {"maj": doc["maj"], "total": len(js), "virtuel": True, "joueurs": js})
+    def ficha(self, lic):
+        """ficha de um jogador qualquer: dados + jogos + virtuais (cache 30 min); nao passa a segui-lo"""
+        c = FICHAS.get(lic)
+        if c and time.time() - c[0] < 1800: return self.responde(200, c[1])
+        try:
+            with TRAVA:
+                f = pp.fiche(lic)
+                if not f.get("nom") or f.get("mensuels") is None: return self.responde(404, {"erreur": "Licence introuvable"})
+                ms = pp.completa(pp.matchs(lic), f.get("mensuels"), ADV)
+        except BaseException: return self.responde(502, {"erreur": "Ping Pocket ne répond pas"})
+        mens = f.get("mensuels") or 0; val = sum(m["pts"] for m in ms if m["officiel"]); ref = mens + val; pend = 0.0
+        for m in ms:
+            if m["officiel"]: continue
+            if m.get("advPts") is not None and m.get("v") is not None: m["ptsVirt"] = pp.base(ref, m["advPts"], m["v"])*m.get("coef", 1)
+            else: m["ptsVirt"] = m["pts"]
+            pend += m["ptsVirt"]
+        r = {"licence": lic, **f, "valides": val, "attente": pend, "virtuels": round(ref + pend, 2), "matchs": ms,
+             "suivi": os.path.exists(f"data/{lic}.json")}
+        FICHAS[lic] = (time.time(), r); self.responde(200, r)
     def log_message(self, *a): pass
 
 if __name__ == "__main__":
