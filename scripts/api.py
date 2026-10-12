@@ -58,6 +58,8 @@ class H(BaseHTTPRequestHandler):
         r = {"licence": lic, **f, "suivi": os.path.exists(f"data/{lic}.json")}
         CACHE[lic] = (time.time(), r); self.responde(200, r)
     def do_POST(self):
+        mm = re.fullmatch(r"/api/maj/(\d{5,8})", self.path.split("?")[0])
+        if mm: return self.maj(mm.group(1))
         m = re.fullmatch(r"/api/joueur/(\d{5,8})", self.path.split("?")[0])
         if not m: return self.responde(404, {"erreur": "inconnu"})
         lic = m.group(1)
@@ -115,6 +117,16 @@ class H(BaseHTTPRequestHandler):
         r = {"licence": lic, **f, "valides": val, "attente": pend, "virtuels": round(ref + pend, 2), "matchs": ms,
              "suivi": os.path.exists(f"data/{lic}.json")}
         FICHAS[lic] = (time.time(), r); self.responde(200, r)
+    def maj(self, lic):
+        """atualizacao imediata de um favorito (botao da app): dados frescos da Ping Pocket; nao repete se < 10 min"""
+        f = f"data/{lic}.json"
+        try:
+            if os.path.exists(f) and time.time() - os.path.getmtime(f) < 600: return self.responde(200, json.load(open(f)))
+            with TRAVA: pp.main([lic])
+            d = json.load(open(f))
+        except BaseException: return self.responde(502, {"erreur": "Ping Pocket ne répond pas, réessaie plus tard"})
+        threading.Thread(target=publica, args=(lic,), daemon=True).start()
+        self.responde(200, d)
     def log_message(self, *a): pass
 
 if __name__ == "__main__":

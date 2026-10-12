@@ -161,7 +161,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
       <div class="bar"><i id="hBar" style="width:0"></i></div>
       <div class="bar-l"><span id="hBarL">—</span><span id="hBarR">—</span></div>
     </div>
-    <div class="row-actions" id="ppBar" hidden><button class="btn ghost small" id="ppSync">↻ Mettre à jour (Ping Pocket)</button><span class="hint" id="ppInfo" style="align-self:center;margin:0"></span></div>
+    <div class="row-actions" id="ppBar" hidden><button class="btn ghost small" id="ppSync">↻ Mettre à jour</button><button class="btn ghost small" id="ppTodos">↻ Tous les favoris</button><span class="hint" id="ppInfo" style="align-self:center;margin:0"></span></div>
     <div id="demoFlag" class="demo-flag" hidden>Exemple de démonstration : touche 👤 et ajoute un joueur par son n° de licence.</div>
 
     <h2>Évolution depuis la situation mensuelle</h2>
@@ -252,7 +252,7 @@ textarea{width:100%;min-height:140px;font:13px/1.4 ui-monospace,Menlo,monospace;
     <h2>Coefficients</h2>
     <div class="card tablewrap"><table class="grille" id="coefs"></table></div>
     <p class="note" style="margin-top:12px">Les coefficients peuvent changer d'une saison à l'autre : en cas de doute, choisis « Autre » et saisis le coefficient indiqué par la FFTT. Résultat officiel : seule la situation mensuelle FFTT fait foi.</p>
-    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-14</span></p>
+    <p class="note" style="margin-top:16px">Ping Virtual · version <span id="vApp">pv-15</span></p>
     <h2>Sauvegarde</h2>
     <div class="card">
       <p class="note" style="margin-top:0">Les données restent sur ce téléphone. Exporte-les pour les garder ou les passer sur un autre appareil.</p>
@@ -656,7 +656,18 @@ function infoPP(){
   const j = J(), bar = $("ppBar"); bar.hidden = !j.licence;
   if (j.licence) $("ppInfo").textContent = j.pp && j.pp.maj ? `Ping Pocket du ${dataFr(j.pp.maj.slice(0,10))} ${j.pp.maj.slice(11,16)} UTC` : "";
 }
-$("ppSync").onclick = () => sync(J(), true);
+async function majAgora(j){
+  const info = $("ppInfo"); if (info && j.id === J().id) info.textContent = "mise à jour en direct… (jusqu'à 1 min)";
+  const d = await api(`/maj/${j.licence}`, "POST");
+  if (d.erreur){ if (info && j.id === J().id) info.textContent = d.erreur; return false; }
+  aplica(j, d); sauve(); tudo(); return true;
+}
+$("ppTodos").onclick = async () => {
+  const b = $("ppTodos"), fav = D.joueurs.filter(p => p.licence); b.disabled = true; let ok = 0;
+  for (const [i, p] of fav.entries()){ b.textContent = `↻ ${i + 1}/${fav.length}…`; if (await majAgora(p)) ok++; }
+  b.textContent = `↻ Tous les favoris`; b.disabled = false; $("ppInfo").textContent = `${ok}/${fav.length} favoris à jour`;
+};
+$("ppSync").onclick = async () => { const b = $("ppSync"); b.disabled = true; await majAgora(J()); b.disabled = false; };
 
 // ---------------- classement régional (backoffice: /api/classement)
 let rSexe = "", rUltimo = "", rModo = "";
