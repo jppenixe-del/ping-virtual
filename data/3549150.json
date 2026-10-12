@@ -1,6 +1,6 @@
 {
  "licence": "3549150",
- "maj": "2026-10-12T03:17Z",
+ "maj": "2026-10-12T12:18Z",
  "classement": 10.0,
  "mensuels": 1079.0,
  "officielsPhase": 766.0,
@@ -17,7 +17,8 @@
    "v": true,
    "officiel": false,
    "advPts": 1032.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "4471309"
   },
   {
    "date": "2026-10-11",
@@ -27,7 +28,8 @@
    "v": true,
    "officiel": false,
    "advPts": 1020.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "7891407"
   },
   {
    "date": "2026-10-11",
@@ -37,7 +39,8 @@
    "v": true,
    "officiel": false,
    "advPts": 835.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "7228784"
   },
   {
    "date": "2026-10-11",
@@ -47,7 +50,8 @@
    "v": true,
    "officiel": false,
    "advPts": 841.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "7886241"
   },
   {
    "date": "2026-10-11",
@@ -57,7 +61,8 @@
    "v": true,
    "officiel": false,
    "advPts": 799.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "8530548"
   },
   {
    "date": "2026-10-11",
@@ -67,7 +72,8 @@
    "v": true,
    "officiel": false,
    "advPts": 777.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "2816829"
   },
   {
    "date": "2026-10-11",
@@ -77,7 +83,8 @@
    "v": true,
    "officiel": false,
    "advPts": 644.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "4114563"
   },
   {
    "date": "2026-10-11",
@@ -87,7 +94,8 @@
    "v": false,
    "officiel": false,
    "advPts": 1126.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "3734367"
   },
   {
    "date": "2026-10-04",
@@ -97,7 +105,8 @@
    "v": true,
    "officiel": false,
    "advPts": 1318.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "291337"
   },
   {
    "date": "2026-10-04",
@@ -107,7 +116,8 @@
    "v": false,
    "officiel": false,
    "advPts": 1245.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "2910429"
   },
   {
    "date": "2026-10-04",
@@ -117,7 +127,8 @@
    "v": false,
    "officiel": false,
    "advPts": 1209.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "2925615"
   },
   {
    "date": "2026-09-27",
@@ -125,7 +136,10 @@
    "adv": "DORVAL Jean",
    "pts": 21.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1492.0,
+   "coef": 0.75,
+   "advLic": "9227988"
   },
   {
    "date": "2026-09-27",
@@ -133,7 +147,10 @@
    "adv": "CAMPANA Loic",
    "pts": 6.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1178.0,
+   "coef": 0.75,
+   "advLic": "4520259"
   },
   {
    "date": "2026-09-27",
@@ -141,7 +158,10 @@
    "adv": "CRENN Raphael",
    "pts": 6.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1174.0,
+   "coef": 0.75,
+   "advLic": "9453245"
   },
   {
    "date": "2026-09-27",
@@ -149,7 +169,10 @@
    "adv": "ANGE THOMAS Rafael",
    "pts": 4.5,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1084.0,
+   "coef": 0.75,
+   "advLic": "3539308"
   },
   {
    "date": "2026-09-27",
@@ -157,7 +180,10 @@
    "adv": "DOR DA SILVA Octave",
    "pts": 3.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 944.0,
+   "coef": 0.75,
+   "advLic": "3549476"
   },
   {
    "date": "2026-09-27",
@@ -165,7 +191,10 @@
    "adv": "REIBALDI Paol",
    "pts": 1.5,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 809.0,
+   "coef": 0.75,
+   "advLic": "3550210"
   },
   {
    "date": "2026-09-27",
@@ -173,7 +202,10 @@
    "adv": "BARRAIS Clément",
    "pts": 0.75,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 779.0,
+   "coef": 0.75,
+   "advLic": "3552275"
   },
   {
    "date": "2026-09-27",
@@ -181,7 +213,10 @@
    "adv": "CAILLEAU Raphaël",
    "pts": -2.25,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1193.0,
+   "coef": 0.75,
+   "advLic": "2723076"
   },
   {
    "date": "2026-09-27",
@@ -189,7 +224,10 @@
    "adv": "MARTIN Sam",
    "pts": -2.25,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1190.0,
+   "coef": 0.75,
+   "advLic": "6950146"
   },
   {
    "date": "2026-09-26",
@@ -197,7 +235,10 @@
    "adv": "KERNEC Cedric",
    "pts": 21.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1482.0,
+   "coef": 0.75,
+   "advLic": "5613105"
   },
   {
    "date": "2026-09-26",
@@ -205,7 +246,10 @@
    "adv": "DUCLOS Arthur",
    "pts": 9.75,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1241.0,
+   "coef": 0.75,
+   "advLic": "3724456"
   },
   {
    "date": "2026-09-26",
@@ -213,7 +257,10 @@
    "adv": "LURON Tom",
    "pts": 4.125,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1035.0,
+   "coef": 0.75,
+   "advLic": "1427086"
   },
   {
    "date": "2026-09-26",
@@ -221,7 +268,10 @@
    "adv": "HAMONIAUX Inès",
    "pts": 3.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 933.0,
+   "coef": 0.75,
+   "advLic": "3544628"
   },
   {
    "date": "2026-09-26",
@@ -229,7 +279,9 @@
    "adv": "LUCAS Ifig",
    "pts": 0.0,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1525.0,
+   "advLic": "5022744"
   },
   {
    "date": "2026-09-26",
@@ -237,7 +289,10 @@
    "adv": "MAYEUX Lise",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1363.0,
+   "coef": 0.75,
+   "advLic": "2942876"
   },
   {
    "date": "2026-09-26",
@@ -245,7 +300,10 @@
    "adv": "BLANCHARD Bastien",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1291.0,
+   "coef": 0.75,
+   "advLic": "9233980"
   },
   {
    "date": "2026-09-26",
@@ -253,7 +311,10 @@
    "adv": "HENNA Mathis",
    "pts": -2.25,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1205.0,
+   "coef": 0.75,
+   "advLic": "3530244"
   },
   {
    "date": "2026-09-20",
@@ -261,7 +322,10 @@
    "adv": "RAIMBAULT Noelig",
    "pts": 22.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1429.0,
+   "coef": 1.0,
+   "advLic": "3530926"
   },
   {
    "date": "2026-09-20",
@@ -269,7 +333,10 @@
    "adv": "DAVID Christian",
    "pts": -0.5,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1402.0,
+   "coef": 1.0,
+   "advLic": "3534293"
   },
   {
    "date": "2026-09-20",
@@ -277,7 +344,10 @@
    "adv": "GROSOS Cyrille",
    "pts": -1.0,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1375.0,
+   "coef": 1.0,
+   "advLic": "1420070"
   },
   {
    "date": "2026-09-13",
@@ -285,7 +355,10 @@
    "adv": "BAZIN Kylian",
    "pts": 16.5,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1396.0,
+   "coef": 0.75,
+   "advLic": "5326753"
   },
   {
    "date": "2026-09-13",
@@ -293,7 +366,10 @@
    "adv": "CAMPANA Loic",
    "pts": 6.0,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1178.0,
+   "coef": 0.75,
+   "advLic": "4520259"
   },
   {
    "date": "2026-09-13",
@@ -301,7 +377,10 @@
    "adv": "PAPIN Clément",
    "pts": 4.5,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1075.0,
+   "coef": 0.75,
+   "advLic": "5625811"
   },
   {
    "date": "2026-09-13",
@@ -309,7 +388,10 @@
    "adv": "KLUTCHNIKOFF Paulin",
    "pts": 4.125,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1031.0,
+   "coef": 0.75,
+   "advLic": "3535129"
   },
   {
    "date": "2026-09-13",
@@ -317,7 +399,10 @@
    "adv": "LANDAIS Andy",
    "pts": 3.75,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1004.0,
+   "coef": 0.75,
+   "advLic": "3534724"
   },
   {
    "date": "2026-09-13",
@@ -325,7 +410,10 @@
    "adv": "BARBEY-GOUIN Sasha",
    "pts": 0.75,
    "v": true,
-   "officiel": true
+   "officiel": false,
+   "advPts": 694.0,
+   "coef": 0.75,
+   "advLic": "1430250"
   },
   {
    "date": "2026-09-13",
@@ -333,7 +421,10 @@
    "adv": "CHAUVEAU-CLAQUIN Malo",
    "pts": -0.375,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1461.0,
+   "coef": 0.75,
+   "advLic": "2934027"
   },
   {
    "date": "2026-09-13",
@@ -341,7 +432,10 @@
    "adv": "RICHOMME Efflam",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1281.0,
+   "coef": 0.75,
+   "advLic": "3537979"
   },
   {
    "date": "2026-09-13",
@@ -349,7 +443,10 @@
    "adv": "LEMOUSSU Elouann",
    "pts": -2.25,
    "v": false,
-   "officiel": true
+   "officiel": false,
+   "advPts": 1187.0,
+   "coef": 0.75,
+   "advLic": "3533390"
   }
  ]
 }

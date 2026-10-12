@@ -1,6 +1,6 @@
 {
  "licence": "3549606",
- "maj": "2026-10-12T03:18Z",
+ "maj": "2026-10-12T12:18Z",
  "classement": 7.0,
  "mensuels": 726.0,
  "officielsPhase": 522.0,
@@ -17,7 +17,8 @@
    "v": true,
    "officiel": false,
    "advPts": 766.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "4115822"
   },
   {
    "date": "2026-10-11",
@@ -27,7 +28,8 @@
    "v": true,
    "officiel": false,
    "advPts": 717.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "3549022"
   },
   {
    "date": "2026-10-11",
@@ -37,7 +39,8 @@
    "v": true,
    "officiel": false,
    "advPts": 708.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "4466778"
   },
   {
    "date": "2026-10-11",
@@ -47,7 +50,8 @@
    "v": false,
    "officiel": false,
    "advPts": 1032.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "4471309"
   },
   {
    "date": "2026-10-11",
@@ -57,7 +61,8 @@
    "v": false,
    "officiel": false,
    "advPts": 1044.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "9542005"
   },
   {
    "date": "2026-10-11",
@@ -67,7 +72,8 @@
    "v": false,
    "officiel": false,
    "advPts": 841.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "7886241"
   },
   {
    "date": "2026-10-11",
@@ -77,7 +83,8 @@
    "v": false,
    "officiel": false,
    "advPts": 835.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "7528857"
   },
   {
    "date": "2026-10-11",
@@ -87,7 +94,8 @@
    "v": false,
    "officiel": false,
    "advPts": 836.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "5329967"
   },
   {
    "date": "2026-10-11",
@@ -97,7 +105,8 @@
    "v": false,
    "officiel": false,
    "advPts": 708.0,
-   "coef": 1.5
+   "coef": 1.5,
+   "advLic": "4466778"
   },
   {
    "date": "2026-10-03",
@@ -107,7 +116,8 @@
    "v": true,
    "officiel": false,
    "advPts": 862.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "3515478"
   },
   {
    "date": "2026-10-03",
@@ -117,7 +127,8 @@
    "v": true,
    "officiel": false,
    "advPts": 726.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "3519250"
   },
   {
    "date": "2026-10-03",
@@ -127,7 +138,8 @@
    "v": false,
    "officiel": false,
    "advPts": 856.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "5624251"
   },
   {
    "date": "2026-09-27",
@@ -135,7 +147,8 @@
    "adv": "SAVIGNAN Antoine",
    "pts": 5.25,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3549033"
   },
   {
    "date": "2026-09-27",
@@ -143,7 +156,8 @@
    "adv": "BEHIER Maelig",
    "pts": 1.5,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "5621931"
   },
   {
    "date": "2026-09-27",
@@ -151,7 +165,8 @@
    "adv": "MORANT François",
    "pts": 0.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3544689"
   },
   {
    "date": "2026-09-27",
@@ -159,7 +174,8 @@
    "adv": "BRIELLES Robin",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3539505"
   },
   {
    "date": "2026-09-27",
@@ -167,7 +183,8 @@
    "adv": "HAMEL Elwann",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3550354"
   },
   {
    "date": "2026-09-27",
@@ -175,7 +192,8 @@
    "adv": "IMMELE Jocelyn",
    "pts": -3.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3552049"
   },
   {
    "date": "2026-09-27",
@@ -183,7 +201,8 @@
    "adv": "BREMONT Charles",
    "pts": -3.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3550310"
   },
   {
    "date": "2026-09-26",
@@ -191,7 +210,8 @@
    "adv": "ABERGEL Jonah",
    "pts": 7.5,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3540287"
   },
   {
    "date": "2026-09-26",
@@ -199,7 +219,8 @@
    "adv": "LANZERE Titouan",
    "pts": 2.25,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3540636"
   },
   {
    "date": "2026-09-26",
@@ -207,7 +228,8 @@
    "adv": "GUILLAUME Benjamin",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "8530785"
   },
   {
    "date": "2026-09-26",
@@ -215,7 +237,8 @@
    "adv": "BRIELLES Robin",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3539505"
   },
   {
    "date": "2026-09-26",
@@ -223,7 +246,8 @@
    "adv": "CHOUCQ Léo",
    "pts": -2.25,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3544618"
   },
   {
    "date": "2026-09-26",
@@ -231,7 +255,8 @@
    "adv": "HOUYERE Melvin",
    "pts": -3.0,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3544846"
   },
   {
    "date": "2026-09-19",
@@ -239,7 +264,8 @@
    "adv": "JEGOUREL Jean-philippe",
    "pts": -0.5,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3511477"
   },
   {
    "date": "2026-09-19",
@@ -247,7 +273,8 @@
    "adv": "HALET Michel",
    "pts": -4.5,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3510705"
   },
   {
    "date": "2026-09-19",
@@ -255,7 +282,8 @@
    "adv": "HAMARD Louis",
    "pts": -5.0,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "4933522"
   },
   {
    "date": "2026-09-06",
@@ -263,7 +291,8 @@
    "adv": "LEFEVRE Christophe",
    "pts": 4.5,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "5022814"
   },
   {
    "date": "2026-09-06",
@@ -271,7 +300,8 @@
    "adv": "CREPIN Gregory",
    "pts": 3.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "2723240"
   },
   {
    "date": "2026-09-06",
@@ -279,7 +309,8 @@
    "adv": "GERAY Philippe",
    "pts": 1.5,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "9258962"
   },
   {
    "date": "2026-09-06",
@@ -287,7 +318,8 @@
    "adv": "GILLES Maxence",
    "pts": -0.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "1428310"
   },
   {
    "date": "2026-09-06",
@@ -295,7 +327,8 @@
    "adv": "AARAGE Damien",
    "pts": -3.0,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "9458905"
   },
   {
    "date": "2026-09-06",
@@ -303,7 +336,8 @@
    "adv": "BENETIERE Guy",
    "pts": -3.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "7511420"
   }
  ]
 }

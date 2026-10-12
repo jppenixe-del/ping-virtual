@@ -1,6 +1,6 @@
 {
  "licence": "3538947",
- "maj": "2026-10-12T03:16Z",
+ "maj": "2026-10-12T12:14Z",
  "classement": 7.0,
  "mensuels": 730.0,
  "officielsPhase": 692.0,
@@ -17,7 +17,8 @@
    "v": true,
    "officiel": false,
    "advPts": 500.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "5626922"
   },
   {
    "date": "2026-10-04",
@@ -27,7 +28,8 @@
    "v": true,
    "officiel": false,
    "advPts": 500.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "5626036"
   },
   {
    "date": "2026-10-04",
@@ -37,7 +39,8 @@
    "v": true,
    "officiel": false,
    "advPts": 500.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "5625063"
   },
   {
    "date": "2026-10-02",
@@ -47,7 +50,8 @@
    "v": true,
    "officiel": false,
    "advPts": 612.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "351409"
   },
   {
    "date": "2026-10-02",
@@ -57,7 +61,8 @@
    "v": true,
    "officiel": false,
    "advPts": 500.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "3549576"
   },
   {
    "date": "2026-10-02",
@@ -67,7 +72,8 @@
    "v": false,
    "officiel": false,
    "advPts": 648.0,
-   "coef": 1.0
+   "coef": 1.0,
+   "advLic": "3534676"
   },
   {
    "date": "2026-09-27",
@@ -75,7 +81,8 @@
    "adv": "LISTER Quentin",
    "pts": 4.125,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3528367"
   },
   {
    "date": "2026-09-27",
@@ -83,7 +90,8 @@
    "adv": "HAN Lifeng",
    "pts": 1.5,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3552390"
   },
   {
    "date": "2026-09-27",
@@ -91,7 +99,8 @@
    "adv": "CELLIER Chloé",
    "pts": -0.375,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3536291"
   },
   {
    "date": "2026-09-27",
@@ -99,7 +108,8 @@
    "adv": "MALJOKU Orhan",
    "pts": -3.75,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "2511121"
   },
   {
    "date": "2026-09-27",
@@ -107,7 +117,8 @@
    "adv": "THE Lou-ann",
    "pts": -4.5,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3538247"
   },
   {
    "date": "2026-09-20",
@@ -115,7 +126,8 @@
    "adv": "OLAYA Lucie",
    "pts": 5.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "5617403"
   },
   {
    "date": "2026-09-20",
@@ -123,7 +135,8 @@
    "adv": "BOZZI Marie",
    "pts": 4.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3552211"
   },
   {
    "date": "2026-09-20",
@@ -131,7 +144,8 @@
    "adv": "LE PICART Lydie",
    "pts": 2.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3536656"
   },
   {
    "date": "2026-09-18",
@@ -139,7 +153,8 @@
    "adv": "LE GARREC Sven",
    "pts": 3.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3548873"
   },
   {
    "date": "2026-09-18",
@@ -147,7 +162,8 @@
    "adv": "JAMES Kevin",
    "pts": 2.0,
    "v": true,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3520984"
   },
   {
    "date": "2026-09-18",
@@ -155,7 +171,8 @@
    "adv": "BIGOT Kevin",
    "pts": -6.0,
    "v": false,
-   "officiel": true
+   "officiel": true,
+   "advLic": "3520989"
   }
  ]
 }
