@@ -110,8 +110,11 @@ def main(licences):
     for lic in licences:
         lic = lic.strip()
         if not re.fullmatch(r"\d{5,8}", lic): continue
-        f = fiche(lic); time.sleep(3); ms = completa(matchs(lic), f.get("mensuels"))
-        doc = {"licence": lic, "maj": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%MZ"), **f, "matchs": ms}
+        try:
+            f = fiche(lic); time.sleep(3); ms = completa(matchs(lic), f.get("mensuels"))
+        except SystemExit as e:              # a Ping Pocket falhou para este jogador: os outros continuam
+            print("falhou", lic, e, file=sys.stderr); continue
+        doc = {"licence": lic, "maj": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%MZ"), **f, "matchs": ms}
         json.dump(doc, open(f"data/{lic}.json", "w"), ensure_ascii=False, indent=1)
         val = sum(m["pts"] for m in ms if m["officiel"]); nao = sum(m["pts"] for m in ms if not m["officiel"])
         print(lic, len(ms), "matchs;", f.get("mensuels"), "+ validés", round(val, 2), "+ en attente", round(nao, 2))
