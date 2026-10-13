@@ -208,6 +208,7 @@ function vaiPara(t){       // a imagem mais proxima do tempo t
   let m = 0; QUAD.forEach((q, i) => { if (Math.abs(q.t - t) < Math.abs(QUAD[m].t - t)) m = i; }); mostra(m); return Promise.resolve();
 }
 const agoraT = () => QUAD[idx] ? QUAD[idx].t : 0;
+window.__pvVai = t => vaiPara(t);   // para os testes automaticos: ir para um tempo exato
 function desenha(){
   if (QUAD[idx]) cx.drawImage(QUAD[idx].bmp, 0, 0, W, H);
   $("tempo").value = QUAD.length > 1 ? Math.round(1000*idx/(QUAD.length - 1)) : 0; $("tTxt").textContent = `${fmt(agoraT(), 2)} s · image ${idx + 1}/${QUAD.length}`;
@@ -248,15 +249,20 @@ cv.addEventListener("pointerdown", async e => {
   if (fase === 0 && $("ref").value === "4"){
     const img = cx.getImageData(0, 0, W, H).data, cor = amostraCor(img, p.x, p.y);
     // pixeis da cor da bola ligados ao ponto tocado (enchimento), num raio de 60 px
-    const vis = new Uint8Array(W*H), fila = [[Math.round(p.x), Math.round(p.y)]]; let n = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
-    while (fila.length && n < 20000){
-      const [x, y] = fila.pop(); if (x < 0 || y < 0 || x >= W || y >= H || Math.hypot(x - p.x, y - p.y) > 60) continue;
-      const k = y*W + x; if (vis[k]) continue; vis[k] = 1;
-      const i = k*4; if (Math.abs(img[i]-cor[0]) + Math.abs(img[i+1]-cor[1]) + Math.abs(img[i+2]-cor[2]) > 70) continue;
-      n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
-      fila.push([x+1, y], [x-1, y], [x, y+1], [x, y-1]);
-    }
-    const diam = Math.max(2*Math.sqrt(n/Math.PI), Math.min(x1 - x0 + 1, y1 - y0 + 1));
+    const enche = (tol, rmax) => {
+      const vis = new Uint8Array(W*H), fila = [[Math.round(p.x), Math.round(p.y)]]; let n = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+      while (fila.length && n < 20000){
+        const [x, y] = fila.pop(); if (x < 0 || y < 0 || x >= W || y >= H || Math.hypot(x - p.x, y - p.y) > rmax) continue;
+        const k = y*W + x; if (vis[k]) continue; vis[k] = 1;
+        const i = k*4; if (Math.abs(img[i]-cor[0]) + Math.abs(img[i+1]-cor[1]) + Math.abs(img[i+2]-cor[2]) > tol) continue;
+        n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+        fila.push([x+1, y], [x-1, y], [x, y+1], [x, y-1]);
+      }
+      return {n, d: Math.max(2*Math.sqrt(n/Math.PI), (x1 - x0 + 1 + y1 - y0 + 1)/2)};
+    };
+    // 1) estrita (so' o miolo da bola); 2) tolerancia larga para apanhar a sombra, mas sem sair muito do miolo (camisola, pele)
+    const e1 = enche(70, 60), e2 = enche(120, Math.max(6, e1.d*0.8));
+    const n = e1.n, diam = Math.min(e2.d, e1.d*1.5);
     if (n < 12 || diam > 110){ $("estado").textContent = "Balle non reconnue : touche bien le centre d'une balle nette (ou choisis un autre repère)."; return; }
     cal = [{x: p.x - diam/2, y: p.y}, {x: p.x + diam/2, y: p.y}];
     escala = 4/diam; fase = 1; $("estado").textContent = `Balle mesurée : ${fmt(diam)} px de diamètre → 1 cm = ${fmt(1/escala)} px.`;
@@ -296,24 +302,63 @@ function procura(img, cor, px, py, raio, tol){
   }
   return n >= 6 ? {x: sx/n, y: sy/n, n, r: Math.sqrt(n/Math.PI)} : null;
 }
+function manchas(img, ant, cor, px, py, raio, tol, area){
+  const x0 = Math.max(0, Math.floor(px - raio)), x1 = Math.min(W - 1, Math.ceil(px + raio));
+  const y0 = Math.max(0, Math.floor(py - raio)), y1 = Math.min(H - 1, Math.ceil(py + raio));
+  const w = x1 - x0 + 1, h = y1 - y0 + 1, m = new Uint8Array(w*h);
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){
+    const i = (y*W + x)*4;
+    if (Math.abs(img[i] - cor[0]) + Math.abs(img[i+1] - cor[1]) + Math.abs(img[i+2] - cor[2]) < tol) m[(y - y0)*w + (x - x0)] = 1;
+  }
+  const out = [];
+  for (let k = 0; k < m.length; k++){
+    if (m[k] !== 1) continue;
+    let n = 0, sx = 0, sy = 0, mov = 0; const pilha = [k]; m[k] = 2;
+    while (pilha.length){
+      const q = pilha.pop(), x = q % w, y = (q / w) | 0; n++; sx += x; sy += y;
+      if (ant){ const i = ((y + y0)*W + x + x0)*4; if (Math.abs(img[i] - ant[i]) + Math.abs(img[i+1] - ant[i+1]) + Math.abs(img[i+2] - ant[i+2]) > 30) mov++; }
+      if (x > 0 && m[q-1] === 1){ m[q-1] = 2; pilha.push(q-1); } if (x < w-1 && m[q+1] === 1){ m[q+1] = 2; pilha.push(q+1); }
+      if (y > 0 && m[q-w] === 1){ m[q-w] = 2; pilha.push(q-w); } if (y < h-1 && m[q+w] === 1){ m[q+w] = 2; pilha.push(q+w); }
+    }
+    if (area && (n < area*0.25 || n > area*3)) continue;          // do tamanho da bola (com margem para o desfocado)
+    if (!area && n < 6) continue;
+    out.push({x: sx/n + x0, y: sy/n + y0, n, mov: mov/n, r: Math.sqrt(n/Math.PI)});
+  }
+  return out;
+}
+function melhor(cands, px, py){
+  let b = null, bs = 1e9;
+  cands.forEach(c => { const sc = Math.hypot(c.x - px, c.y - py)*(c.mov > 0.15 ? 0.6 : 1); if (sc < bs){ bs = sc; b = c; } });
+  return b;
+}
 async function segue(p){
   $("estado").textContent = "Suivi de la balle…";
   const t0 = agoraT(), i0 = idx;
   let img = cx.getImageData(0, 0, W, H).data;
   const cor = amostraCor(img, p.x, p.y);
-  let atual = procura(img, cor, p.x, p.y, 14, 90) || {...p, r: 6};
+  // a bola tocada: a mancha mais perto do toque; o seu tamanho passa a ser a referencia
+  const ini = melhor(manchas(img, null, cor, p.x, p.y, 30, 80, 0), p.x, p.y);
+  let atual = ini ? {...ini} : {...p, r: 6}; const area = ini ? ini.n : 0;
   soltura = {...atual, t: t0}; traj = [soltura];
-  let vel = {x: 0, y: 0}, perdidos = 0, melhor = soltura;
+  let vel = {x: 0, y: 0}, perdidos = 0, alto = soltura, ant = img;
   for (let k = i0 + 1; k < QUAD.length && k < i0 + 600; k++){
     cx.drawImage(QUAD[k].bmp, 0, 0, W, H); img = cx.getImageData(0, 0, W, H).data;
-    const prev = {x: atual.x + vel.x, y: atual.y + vel.y}, raio = Math.max(25, Math.hypot(vel.x, vel.y)*2.5);
-    const q = procura(img, cor, prev.x, prev.y, raio, 90);
-    if (!q){ if (++perdidos > 4) break; atual = {...atual, x: prev.x, y: prev.y}; continue; }
+    // previsao: velocidade + travagem medida nas ultimas imagens (a bola em voo segue a curva da gravidade)
+    const n = traj.length, ay = n >= 4 ? ((traj[n-1].y - traj[n-2].y) - (traj[n-3].y - traj[n-4].y))/2 : 0;
+    if (perdidos) vel = {x: vel.x, y: vel.y + Math.max(0, ay)};
+    const prev = {x: atual.x + vel.x, y: atual.y + vel.y}, raio = Math.max(18, Math.hypot(vel.x, vel.y)*2 + (atual.r || 6)*2 + perdidos*4);
+    const q = melhor(manchas(img, ant, cor, prev.x, prev.y, raio, 95, area), prev.x, prev.y); ant = img;
+    // escondida (atras de algo da mesma cor, ou desfocada): segue a curva prevista ate' 15 imagens e volta a procurar
+    if (!q){ if (++perdidos > 15) break; atual = {...atual, x: prev.x, y: prev.y}; continue; }
+    if (perdidos && Math.hypot(q.x - prev.x, q.y - prev.y) > raio*0.6){ if (++perdidos > 15) break; atual = {...atual, x: prev.x, y: prev.y}; continue; }   // nao bate com a trajetoria
     perdidos = 0; vel = {x: q.x - atual.x, y: q.y - atual.y}; atual = {...q, t: QUAD[k].t}; traj.push(atual);
-    if (atual.y < melhor.y) melhor = atual;
-    if (atual.y > soltura.y + 4 && melhor.y < soltura.y - 5) break;          // ja' desceu abaixo do ponto de partida
+    if (atual.y < alto.y) alto = atual;
+    // ja' desceu o suficiente depois do topo: chega (a seguir a bola e' batida pela raquete e o seguimento perde o sentido)
+    const subida = soltura.y - alto.y;
+    if (subida > 5 && atual.y > alto.y + Math.max(8, 0.2*subida)) break;
+    if (atual.y > soltura.y + 4 && alto.y < soltura.y - 5) break;          // ja' desceu abaixo do ponto de partida
   }
-  topo = melhor;
+  topo = alto;
   if (traj.length < 3 || soltura.y - topo.y < 3){ $("estado").textContent = "Balle perdue : essaie de toucher la balle plus précisément, ou utilise « Marquer à la main »."; topo = null; traj = []; desenha(); return; }
   await vaiPara(topo.t); mostraResultado();
 }
@@ -328,10 +373,26 @@ function analisa(){
     for (let i = 2; i < tp.length; i++){ const dt = tp[i].t - tp[i-2].t; if (dt <= 0) continue; const vy = (tp[i-2].y - tp[i].y)/dt; if (vy > vmax && tp[i].y > topo.y + 2){ vmax = vy; iRel = i === 2 ? 0 : i - 1; } }   // ja' a subir desde o inicio: o 1.o ponto
   }
   const rel = tp.length >= 6 ? tp[iRel] : soltura;
+  // topo escondido (atras de algo da mesma cor) ou desfocado: vertice da parabola ajustada aos pontos DEPOIS do lancamento
+  // so' o voo livre: do lancamento ate' pouco depois do topo visto (depois a bola pode ser batida pela raquete)
+  let iTopObs = 0; tp.forEach((p, i) => { if (p.y < tp[iTopObs].y) iTopObs = i; });
+  const pos = tp.slice(iRel, Math.min(tp.length, iTopObs + 5));
+  if (pos.length >= 6 && !topo.est){
+    const t0v = pos[0].t; let S = [0,0,0,0,0], R = [0,0,0], Rx = [0,0];
+    pos.forEach(p => { const t = p.t - t0v; S[0]++; S[1] += t; S[2] += t*t; S[3] += t**3; S[4] += t**4; R[0] += p.y; R[1] += p.y*t; R[2] += p.y*t*t; Rx[0] += p.x; Rx[1] += p.x*t; });
+    const M = [[S[0],S[1],S[2]],[S[1],S[2],S[3]],[S[2],S[3],S[4]]], det = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+    const D0 = det(M), cf = j => det(M.map((r, i) => r.map((v, c) => c === j ? R[i] : v)))/D0;
+    const A = cf(0), B = cf(1), C = cf(2), tmax = pos[pos.length - 1].t - t0v;
+    if (C > 0){
+      const tv = -B/(2*C), yv = A + B*tv + C*tv*tv;
+      const bx = (S[0]*Rx[1] - S[1]*Rx[0])/(S[0]*S[2] - S[1]*S[1] || 1), ax = (Rx[0] - bx*S[1])/S[0];
+      // so' quando ha' pontos a descer depois do vertice (a curva esta' fechada) e o vertice fica acima do ponto visto
+      if (tv > 0 && tv < tmax - 1e-3 && yv < topo.y - 2 && topo.y - yv < (rel.y - topo.y)) topo = {x: ax + bx*tv, y: yv, t: t0v + tv, est: true};
+    }
+  }
   // escala pela gravidade: parabola y = a + b t + c t^2 depois do lancamento ate' ao topo (+2 imagens)
   let pxcm_g = null;
-  const iTop = tp.indexOf(topo) >= 0 ? tp.indexOf(topo) : tp.length - 1;
-  const seg = tp.slice(iRel, Math.min(tp.length, iTop + 3));
+  const seg = tp.slice(iRel, Math.min(tp.length, iTopObs + 3));
   if (FPS_REAL && seg.length >= 5){
     const t0 = seg[0].t; let S = [0,0,0,0,0], R = [0,0,0];
     seg.forEach(p => { const t = p.t - t0; S[0]++; S[1] += t; S[2] += t*t; S[3] += t*t*t; S[4] += t*t*t*t; R[0] += p.y; R[1] += p.y*t; R[2] += p.y*t*t; });
@@ -339,7 +400,8 @@ function analisa(){
     const D = det(M), Mc = M.map((r, i) => [r[0], r[1], R[i]]), c = det(Mc)/D;   // regra de Cramer para o termo t^2
     if (c > 0) pxcm_g = 2*c/981;                         // y cresce para baixo: aceleracao = +2c px/s^2 = 981 cm/s^2
   }
-  const cmpx = escala === "g" ? (pxcm_g ? 1/pxcm_g : null) : escala;
+  // com a velocidade real conhecida, a gravidade e' a escala principal (a bola desfocada parece maior do que e')
+  const cmpx = (escala === "g" || (FPS_REAL && pxcm_g)) ? (pxcm_g ? 1/pxcm_g : null) : escala;
   return {rel, cmpx, pxcm_g, vmaxCm: null, iRel, tp};
 }
 function mostraResultado(){
@@ -353,8 +415,10 @@ function mostraResultado(){
   const okA = dy >= 16, okG = ang <= tol;
   $("rAlt").className = okA ? "ok" : "ko"; $("tAlt").textContent = okA ? "✅ ≥ 16 cm" : "❌ moins de 16 cm";
   $("rAng").className = okG ? "ok" : "ko"; $("tAng").textContent = okG ? `✅ ≤ ${tol}°` : `❌ plus de ${tol}°`;
-  let extra = `Lâcher détecté à ${fmt(soltura.t ?? 0, 3)} s · vitesse de lancer ≈ ${fmt(v0, 2)} m/s · échelle : ${escala === "g" ? "gravité" : "repère"}`;
-  if (escala !== "g" && A.pxcm_g){ const altG = (soltura.y - topo.y)/A.pxcm_g; extra += ` · contrôle gravité : ${fmt(altG)} cm`; }
+  const porG = escala === "g" || (FPS_REAL && A.pxcm_g);
+  let extra = `Lâcher détecté à ${fmt(soltura.t ?? 0, 3)} s · vitesse de lancer ≈ ${fmt(v0, 2)} m/s · échelle : ${porG ? "gravité" : "repère"}`;
+  if (porG && escala !== "g") extra += ` · contrôle repère : ${fmt((soltura.y - topo.y)*escala)} cm`;
+  if (topo && topo.est) extra += " · sommet caché : estimé par la courbe";
   $("resultado").hidden = false; $("estado").textContent = (traj.length > 2 ? `${traj.length} images suivies. ` : "Points marqués à la main. ") + extra;
 }
 let ULTIMO = null;
