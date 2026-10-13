@@ -74,7 +74,7 @@ a{color:var(--table)}
 
   <div class="card" style="margin-top:12px">
     <div class="etapa">1. Filme le service <b>de côté</b>, téléphone posé, ou choisis une vidéo.</div>
-    <div class="row"><button class="btn" id="abreCam">🎥 Filmer (HD, haute vitesse)</button>
+    <div class="row"><button class="btn" id="camNativa" hidden style="background:var(--ball)">📱 Caméra rapide (jusqu'à 240 i/s)</button><button class="btn" id="abreCam">🎥 Filmer (HD, haute vitesse)</button>
       <label class="btn ghost" style="cursor:pointer">📁 Choisir une vidéo<input type="file" id="arq" accept="video/*" hidden></label></div>
     <div id="camZona" hidden style="margin-top:10px">
       <div class="stage"><video id="prev" autoplay muted playsinline style="display:block;width:100%"></video></div>
@@ -183,6 +183,18 @@ function extrai(){
   });
 }
 function mostra(i){ idx = Math.max(0, Math.min(QUAD.length - 1, i)); desenha(); }
+// ---- dentro da app Android: camara nativa de alta velocidade (o video volta com a velocidade real)
+if (window.Android && window.Android.camera240){
+  $("camNativa").hidden = false; $("camNativa").onclick = () => window.Android.camera240();
+}
+window.pvVideoNativo = async (url, fps, info) => {
+  try {
+    const b = await (await fetch(url)).blob();
+    FPS_REAL = fps; PASSO = 1/fps; $("fpsIn").value = fps;
+    abreVideo(new File([b], "camera.mp4", {type: "video/mp4"}));
+    setTimeout(() => { $("info").textContent = info + " · " + $("info").textContent; }, 50);
+  } catch(e){ $("info").textContent = "Vidéo introuvable : " + e; }
+};
 // ---- camera da propria app: HD (1280x720) a' maior velocidade que o telemovel permitir
 let stream = null, rec = null, pedacos = [];
 $("abreCam").onclick = async () => {
