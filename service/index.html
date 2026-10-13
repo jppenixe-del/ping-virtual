@@ -105,7 +105,7 @@ a{color:var(--table)}
       </div>
       <div class="row" style="margin-top:8px" id="fpsRow"><span class="hint">Vitesse réelle de la vidéo :</span><input type="number" id="fpsIn" placeholder="images/s" style="width:110px"><span class="hint">(si connue : permet l'échelle par la gravité)</span></div>
       <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
-      <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (bêta)</button>
+      <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (IA)</button>
         <select id="tipoBola" aria-label="Balle"><option value="branca">Balle blanche</option><option value="laranja">Balle orange</option></select></div>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
@@ -126,6 +126,7 @@ a{color:var(--table)}
   <p class="hint" style="margin-top:14px">Conseils : caméra à hauteur de la main, perpendiculaire au lancer, fond uni et balle orange si possible. L'arbitrage vidéo (TTR) accepte jusqu'à 30° par rapport à la verticale : c'est la tolérance par défaut, réglable ci-dessus.</p>
 </div>
 
+<script src="ia/bolaia.js"></script>
 <script>
 (function(){
 const $ = id => document.getElementById(id);
@@ -594,6 +595,106 @@ $("dirFim").onclick = () => {
 // ---------------------------------------------------------------- DETECAO AUTOMATICA
 // Sem tocar na bola: em cada imagem, as manchas que mudaram (diferenca com 2 imagens antes) com tamanho e forma de bola;
 // ligam-se em trajetorias; escolhe-se a que sobe e trava como uma bola em queda livre (parabola com a concavidade certa).
+// ---- detecao por IA: a rede encontra a bola em cada imagem; o lancamento e' a trajetoria que sobe com a gravidade certa
+const ajustaParab = seg => {      // y = A + B t + C t^2 e x = ax + bx t (minimos quadrados)
+  const t0 = seg[0].t; let S = [0,0,0,0,0], R = [0,0,0], Rx = [0,0];
+  seg.forEach(p => { const t = p.t - t0; S[0]++; S[1] += t; S[2] += t*t; S[3] += t**3; S[4] += t**4; R[0] += p.y; R[1] += p.y*t; R[2] += p.y*t*t; Rx[0] += p.x; Rx[1] += p.x*t; });
+  const M = [[S[0],S[1],S[2]],[S[1],S[2],S[3]],[S[2],S[3],S[4]]], det = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+  const D = det(M); if (!D) return null; const cf = j => det(M.map((r, i) => r.map((v, c) => c === j ? R[i] : v)))/D;
+  const bx = (S[0]*Rx[1] - S[1]*Rx[0])/(S[0]*S[2] - S[1]*S[1] || 1), ax = (Rx[0] - bx*S[1])/S[0];
+  const A = cf(0), B = cf(1), C = cf(2);
+  let res = 0; seg.forEach(p => { const t = p.t - t0; res += (A + B*t + C*t*t - p.y)**2; });
+  return {t0, A, B, C, ax, bx, res: Math.sqrt(res/seg.length), y: t => A + B*(t - t0) + C*(t - t0)**2, x: t => ax + bx*(t - t0)};
+};
+async function detetaIA(){
+  $("estado").textContent = "Chargement du détecteur IA…";
+  await BolaIA.carrega();
+  const dts = QUAD.slice(1).map((q, i) => q.t - QUAD[i].t).filter(d => d > 0).sort((a, b) => a - b);
+  const dtQ = dts.length ? dts[dts.length >> 1] : 1/30, passo = Math.max(1, Math.round(1/(60*dtQ)));
+  // a imagem inteira em quadrados de 640 (ou do lado menor), sobrepostos
+  const L = Math.min(W, H), tiles = [];
+  if (H > W){ const n = Math.ceil(H/L - 0.15); for (let j = 0; j < n; j++) tiles.push([0, Math.round(j*(H - L)/Math.max(1, n - 1)), L, L]); }
+  else { const n = Math.ceil(W/L - 0.15); for (let j = 0; j < n; j++) tiles.push([Math.round(j*(W - L)/Math.max(1, n - 1)), 0, L, L]); }
+  const vistos = [];
+  for (let i = 0; i < QUAD.length; i += passo){
+    let cs = [];
+    for (const [x, y, w, h] of tiles) cs.push(...await BolaIA.deteta(QUAD[i].bmp, x, y, w, h, 640, 0.12));
+    cs = cs.filter((a, j) => !cs.some((b, k) => k < j && Math.hypot(a.x - b.x, a.y - b.y) < 6));
+    cs.forEach(c => vistos.push({...c, i, t: QUAD[i].t}));
+    if ((i/passo) % 5 === 0){ $("estado").textContent = `IA : recherche de la balle… ${Math.round(100*i/QUAD.length)} %`; await new Promise(r => setTimeout(r)); }
+  }
+  // ligar as detecoes em trajetorias (posicao prevista pela velocidade)
+  let abertas = [], fechadas = [];
+  const porI = new Map(); vistos.forEach(v => { if (!porI.has(v.i)) porI.set(v.i, []); porI.get(v.i).push(v); });
+  [...porI.keys()].sort((a, b) => a - b).forEach(i => {
+    const cs = porI.get(i), usadas = new Set();
+    abertas.forEach(tr => {
+      const u = tr.p[tr.p.length - 1], w = tr.p[tr.p.length - 2], dt = QUAD[i].t - u.t;
+      const v = w ? {x: (u.x - w.x)/(u.t - w.t), y: (u.y - w.y)/(u.t - w.t)} : {x: 0, y: 0};
+      const pr = {x: u.x + v.x*dt, y: u.y + v.y*dt}, nI = Math.max(1, Math.round(dt/dtQ)), gate = w ? Math.max(15, u.w*1.5) + 0.3*Math.hypot(v.x, v.y)*dt : Math.min(80, Math.max(25, u.w*2.5)*nI);
+      let best = -1, bd = gate;
+      cs.forEach((c, j) => { if (usadas.has(j)) return; const dd = Math.hypot(c.x - pr.x, c.y - pr.y); if (dd < bd){ bd = dd; best = j; } });
+      if (best >= 0){ usadas.add(best); tr.p.push(cs[best]); tr.ult = i; }
+    });
+    cs.forEach((c, j) => { if (!usadas.has(j)) abertas.push({p: [c], ult: i}); });
+    fechadas.push(...abertas.filter(tr => i - tr.ult > 4*passo)); abertas = abertas.filter(tr => i - tr.ult <= 4*passo);
+  });
+  fechadas.push(...abertas);
+  window.__iaDbg = {passo, n: vistos.length, tr: fechadas.filter(t => t.p.length >= 3).map(t => t.p.map(p => [p.i, Math.round(p.x), Math.round(p.y), Math.round(p.w), +p.c.toFixed(2)]))};
+  // o lancamento: sobe, trava com a gravidade certa para o tamanho da bola (diametro = 4 cm)
+  const ft = fatorT(); let melhorT = null, melhorS = 0;
+  fechadas.forEach(tr => {
+    const P = tr.p; if (P.length < 4) return;
+    let it = 0; P.forEach((p, j) => { if (p.y < P[it].y) it = j; });
+    let i0 = it; while (i0 > 0 && P[i0-1].y > P[i0].y) i0--;          // inicio da subida
+    const sub = P[i0].y - P[it].y, diam = [...P].map(p => Math.min(p.w, p.h)).sort((a, b) => a - b)[P.length >> 1];
+    if (it - i0 < 2 || sub < diam) return;
+    const seg = P.slice(i0, Math.min(P.length, it + 3)); if (seg.length < 4) return;
+    const f = ajustaParab(seg.map(p => ({...p, t: p.t*ft}))); if (!f || f.C <= 0) return;
+    const razG = f.C/(0.5*981*diam/4); if (razG < 0.3 || razG > 3) return;
+    const conf = seg.reduce((s, p) => s + p.c, 0)/seg.length;
+    const sc = sub/diam*conf*Math.min(1, seg.length/6)/(1 + f.res/diam)/(1 + Math.abs(Math.log(razG)));
+    window.__iaDbg.sc = (window.__iaDbg.sc || []).concat([[P[0].i, sc, razG, sub, diam]]);
+    if (sc > melhorS){ melhorS = sc; melhorT = {P: seg, diam}; }
+  });
+  if (!melhorT) return false;
+  // passagem fina: todas as imagens do lancamento, num recorte a volta da posicao prevista
+  const P = melhorT.P, iA = Math.max(0, P[0].i - passo), iB = Math.min(QUAD.length - 1, P[P.length - 1].i + 2*passo);
+  const fx = ajustaParab(P), R = 96, gate = Math.max(15, 1.5*melhorT.diam), fino = [];
+  for (let i = iA; i <= iB; i++){
+    const t = QUAD[i].t, px = fx.x(t), py = fx.y(t);
+    const perto = cs => { let b = null, bd = gate; cs.forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < bd){ bd = d; b = c; } }); return b; };
+    // 1.o o que a procura geral ja' viu; senao, um recorte 192x192 a' volta da curva (sem mudar a escala), com limiar mais baixo
+    let b = perto(porI.get(i) || []);
+    if (!b){
+      const x = Math.max(0, Math.min(W - 2*R, px - R)), y = Math.max(0, Math.min(H - 2*R, py - R));
+      b = perto(await BolaIA.deteta(QUAD[i].bmp, x, y, 2*R, 2*R, 2*R, 0.06));
+    }
+    if (b) fino.push({x: b.x, y: b.y, t, r: Math.min(b.w, b.h)/2, i});
+    if (i % 10 === 0){ $("estado").textContent = `IA : suivi fin… ${Math.round(100*(i - iA)/(iB - iA + 1))} %`; await new Promise(r => setTimeout(r)); }
+  }
+  // para tras: a subida rapida logo a seguir a' mao (desfocada, a rede ve-a com menos certeza): segue imagem a imagem
+  fino.sort((a, b) => a.i - b.i);
+  for (let falhas = 0, i = fino.length ? fino[0].i - 1 : -1; fino.length >= 2 && i >= 0 && falhas < 3; i--){
+    const a = fino[0], b = fino[1], n = (a.i - i)/(b.i - a.i), px = a.x + (a.x - b.x)*n, py = a.y + (a.y - b.y)*n;
+    const g = Math.max(10, 0.5*Math.hypot(a.x - b.x, a.y - b.y)*Math.max(1, a.i - i) + a.r);
+    const x = Math.max(0, Math.min(W - 2*R, px - R)), y = Math.max(0, Math.min(H - 2*R, py - R));
+    let m = null, md = g; (await BolaIA.deteta(QUAD[i].bmp, x, y, 2*R, 2*R, 2*R, 0.05)).forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < md){ md = d; m = c; } });
+    if (m && m.y > a.y - 1){ fino.unshift({x: m.x, y: m.y, t: QUAD[i].t, r: Math.min(m.w, m.h)/2, i}); falhas = 0; } else falhas++;
+  }
+  // corta antes da subida e depois de descer (a raquete bate na bola)
+  let it = 0; fino.forEach((p, j) => { if (p.y < fino[it].y) it = j; });
+  let i0 = it; while (i0 > 0 && fino[i0-1].y >= fino[i0].y - 0.5) i0--;
+  let i1 = it; const sub = fino.length ? fino[i0].y - fino[it].y : 0;
+  while (i1 < fino.length - 1 && fino[i1+1].y < fino[it].y + Math.max(8, 0.2*sub)) i1++;
+  traj = fino.slice(i0, i1 + 1);
+  if (traj.length < 4) return false;
+  if (!escala){ escala = 4/Math.max(2, 2*traj.map(p => p.r).sort((a, b) => a - b)[traj.length >> 1]); }
+  soltura = traj[0]; topo = traj.reduce((a, p) => p.y < a.y ? p : a, traj[0]);
+  fase = 1; ULTIMO = null; await vaiPara(topo.t); mostraResultado();
+  return ULTIMO && ULTIMO.alt >= 3 && ULTIMO.alt <= 150;
+}
+window.__pvIA = async () => { let ok; try { ok = await detetaIA(); } catch(e){ ok = 'ERRO ' + e; } return {ok, W, H, n: QUAD.length, dbg: window.__iaDbg, traj: (traj || []).map(p => [Math.round(p.x), Math.round(p.y)])}; };
 async function autoDeteta(){
   if (QUAD.length < 8){ $("estado").textContent = "Vidéo trop courte."; return; }
   $("estado").textContent = "Recherche de la balle…";
@@ -677,7 +778,15 @@ async function autoDeteta(){
   if (!plausivel()) return naoAchou();
   $("estado").textContent = "Balle trouvée automatiquement : vérifie que la trajectoire orange suit bien la balle (sinon touche la balle). " + $("estado").textContent;
 }
-$("autoDet").onclick = () => autoDeteta();
+$("autoDet").onclick = async () => {
+  $("autoDet").disabled = true;
+  try {
+    let ok = false;
+    try { ok = await detetaIA(); } catch(e){ console.warn("IA", e); }
+    if (ok) $("estado").textContent = "Balle trouvée par l'IA : vérifie que la trajectoire orange suit bien la balle (sinon touche la balle). " + $("estado").textContent;
+    else await autoDeteta();
+  } finally { $("autoDet").disabled = false; }
+};
 
 // ---- sessao (guardada no telemovel)
 const CLE = "pingvirtual.services";
