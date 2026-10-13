@@ -105,7 +105,8 @@ a{color:var(--table)}
       </div>
       <div class="row" style="margin-top:8px" id="fpsRow"><span class="hint">Vitesse réelle de la vidéo :</span><input type="number" id="fpsIn" placeholder="images/s" style="width:110px"><span class="hint">(si connue : permet l'échelle par la gravité)</span></div>
       <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
-      <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (bêta)</button>
+        <select id="tipoBola" aria-label="Balle"><option value="branca">Balle blanche</option><option value="laranja">Balle orange</option></select></div>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
@@ -431,7 +432,7 @@ function mostraResultado(){
   const dy = (soltura.y - topo.y)*A.cmpx, dx = Math.abs(topo.x - soltura.x)*A.cmpx;
   const ang = Math.atan2(dx, dy)*180/Math.PI, tol = parseFloat($("tol").value) || 30;
   const v0 = Math.sqrt(2*981*Math.max(dy, 0))/100;      // m/s, pela altura atingida
-  ULTIMO = {alt: dy, ang};
+  ULTIMO = {alt: dy, ang, consist: (escala && escala !== "g" && A.pxcm_g) ? (1/escala)/A.pxcm_g : null};
   $("vAlt").textContent = `${fmt(dy)} cm`; $("vAng").textContent = `${fmt(ang)}°`;
   const okA = dy >= 16, okG = ang <= tol;
   $("rAlt").className = okA ? "ok" : "ko"; $("tAlt").textContent = okA ? "✅ ≥ 16 cm" : "❌ moins de 16 cm";
@@ -598,7 +599,12 @@ async function autoDeteta(){
   $("estado").textContent = "Recherche de la balle…";
   const LW2 = Math.min(W, 480), LH2 = Math.round(H*LW2/W), k2 = W/LW2;
   const cvs = document.createElement("canvas"); cvs.width = LW2; cvs.height = LH2; const c2 = cvs.getContext("2d", {willReadFrequently: true});
-  const cinza = i => { c2.drawImage(QUAD[i].bmp, 0, 0, LW2, LH2); const d = c2.getImageData(0, 0, LW2, LH2).data, g = new Uint8Array(LW2*LH2); for (let p = 0, j = 0; p < g.length; p++, j += 4) g[p] = (d[j] + d[j+1] + d[j+2])/3; return g; };
+  const RGB = [];
+  const cinza = i => { c2.drawImage(QUAD[i].bmp, 0, 0, LW2, LH2); const d = c2.getImageData(0, 0, LW2, LH2).data, g = new Uint8Array(LW2*LH2); for (let p = 0, j = 0; p < g.length; p++, j += 4) g[p] = (d[j] + d[j+1] + d[j+2])/3; RGB[i] = d; if (i > 2) RGB[i-3] = null; return g; };
+  // a cor da bola: branca = clara e sem cor; laranja = vermelho alto, azul baixo, bem saturada (a pele fica de fora)
+  const branca = $("tipoBola").value !== "laranja";
+  const corBola = (r, g, b) => branca ? (Math.max(r, g, b) - Math.min(r, g, b) < 50 && (r + g + b)/3 > 120)
+                                       : (r > 170 && r - b > 110 && g > 60 && g < r - 30);
   const G = []; let tracks = [], fechadas = [];
   for (let i = 0; i < QUAD.length; i++){
     G[i] = cinza(i); if (i < 2){ continue; }
@@ -608,11 +614,14 @@ async function autoDeteta(){
     for (let p = 0; p < m.length; p++){
       if (m[p] !== 1) continue;
       let n = 0, sx = 0, sy = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1; const pil = [p]; m[p] = 2;
+      let nc = 0;
       while (pil.length){ const q = pil.pop(), x = q % LW2, y = (q / LW2) | 0; n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        { const d = RGB[i], j = q*4; if (corBola(d[j], d[j+1], d[j+2])) nc++; }
         if (x > 0 && m[q-1] === 1){ m[q-1] = 2; pil.push(q-1); } if (x < LW2-1 && m[q+1] === 1){ m[q+1] = 2; pil.push(q+1); }
         if (y > 0 && m[q-LW2] === 1){ m[q-LW2] = 2; pil.push(q-LW2); } if (y < LH2-1 && m[q+LW2] === 1){ m[q+LW2] = 2; pil.push(q+LW2); } }
       const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-      if (n < 3 || n > 1400 || bw > 3*bh + 3 || bh > 3*bw + 3 || n < 0.3*bw*bh) continue;   // pequena e redonda (o rasto do movimento alonga um pouco)
+      if (n < 3 || n > 1400 || bw > 3*bh + 3 || bh > 3*bw + 3 || n < 0.3*bw*bh) continue;
+      if (nc < 0.5*n) continue;                                     // nao tem a cor da bola (mao, braco, raquete...)   // pequena e redonda (o rasto do movimento alonga um pouco)
       comps.push({x: sx/n, y: sy/n, n, t: QUAD[i].t, i});
     }
     // ligar as manchas as trajetorias abertas (pela posicao prevista)
@@ -641,7 +650,7 @@ async function autoDeteta(){
     const A = cf(0), B = cf(1), C = cf(2); if (C <= 0) return;                         // tem de travar a subir
     // a travagem tem de ser a da gravidade para o tamanho da bola: C = g/2 em px/s2, com px/cm = diametro/4
     const ns0 = P.map(p => p.n).sort((a, b) => a - b), diam0 = 2*Math.sqrt(ns0[ns0.length >> 1]/Math.PI), Cexp = 0.5*981*diam0/4*fatorT()*fatorT();
-    const razG = C/Cexp; if (razG < 0.25 || razG > 4) return;
+    const razG = C/Cexp; if (razG < 0.45 || razG > 2.2) return;
     let res = 0; seg.forEach(p => { const t = p.t - t0; res += (A + B*t + C*t*t - p.y)**2; }); res = Math.sqrt(res/seg.length);
     const ns = P.map(p => p.n).sort((a, b) => a - b), med = ns[ns.length >> 1], var_ = ns.filter(n => n > med*3 || n < med/3).length/ns.length;
     const sc = subida*Math.min(1, P.length/10)/(1 + res)*(1 - var_)/(1 + Math.abs(Math.log(razG)));
@@ -652,15 +661,21 @@ async function autoDeteta(){
   const auto = melhorT.P.map(p => ({x: p.x*k2, y: p.y*k2, t: p.t, r: Math.sqrt(p.n/Math.PI)*k2}));
   if (!escala){ const diam = 2*Math.sqrt(melhorT.med/Math.PI)*k2*0.8; escala = 4/Math.max(2, diam); }
   fase = 1; mostra(melhorT.P[0].i);
-  await segue({x: auto[0].x, y: auto[0].y}, true);
+  ULTIMO = null; await segue({x: auto[0].x, y: auto[0].y}, true);
+  // plausivel: altura possivel e a escala da bola a concordar com a da gravidade (numa trajetoria falsa nao concordam)
+  const plausivel = () => ULTIMO && ULTIMO.alt >= 5 && ULTIMO.alt <= 150 && (ULTIMO.consist == null || (ULTIMO.consist > 0.4 && ULTIMO.consist < 2.5));
+  const naoAchou = () => { $("resultado").hidden = true; traj = []; topo = null; soltura = null; fase = 1; texto(); desenha();
+    $("estado").textContent = "Lancer non trouvé de façon fiable : va à l'image où la balle quitte la main et touche-la (ou « Marquer à la main »)."; };
   if (traj.length >= auto.length && topo && soltura && soltura.y - topo.y > 0.5*(auto[0].y - Math.min(...auto.map(p => p.y)))){
-    $("estado").textContent = "Balle trouvée automatiquement (suivi fin). " + $("estado").textContent; return;
+    if (!plausivel()) return naoAchou();
+    $("estado").textContent = "Balle trouvée automatiquement : vérifie que la trajectoire orange suit bien la balle (sinon touche la balle). " + $("estado").textContent; return;
   }
   // trajetoria na escala de analise e resultado
   traj = auto;
   soltura = traj[0]; topo = traj.reduce((a, p) => p.y < a.y ? p : a, traj[0]);
-  fase = 1; await vaiPara(topo.t); mostraResultado();
-  $("estado").textContent = "Balle trouvée automatiquement. " + $("estado").textContent;
+  fase = 1; ULTIMO = null; await vaiPara(topo.t); mostraResultado();
+  if (!plausivel()) return naoAchou();
+  $("estado").textContent = "Balle trouvée automatiquement : vérifie que la trajectoire orange suit bien la balle (sinon touche la balle). " + $("estado").textContent;
 }
 $("autoDet").onclick = () => autoDeteta();
 
