@@ -47,9 +47,16 @@ a{color:var(--table)}
   <p class="hint">Hauteur et angle du lancer de balle (règle ITTF : lancer presque vertical, au moins 16 cm). <a href="../">← Ping Virtual</a></p>
 
   <div class="card">
-    <div class="etapa">1. Filme le service <b>de côté</b>, téléphone posé (idéalement en <b>ralenti</b>), puis choisis la vidéo.</div>
-    <div class="row"><label class="btn" style="cursor:pointer">Choisir / filmer une vidéo<input type="file" id="arq" accept="video/*" capture="environment" hidden></label>
-      <span class="hint" id="info"></span></div>
+    <div class="etapa">1. Filme le service <b>de côté</b>, téléphone posé, ou choisis une vidéo.</div>
+    <div class="row"><button class="btn" id="abreCam">🎥 Filmer (HD, haute vitesse)</button>
+      <label class="btn ghost" style="cursor:pointer">📁 Choisir une vidéo<input type="file" id="arq" accept="video/*" hidden></label></div>
+    <div id="camZona" hidden style="margin-top:10px">
+      <div class="stage"><video id="prev" autoplay muted playsinline style="display:block;width:100%"></video></div>
+      <div class="row" style="margin-top:8px;justify-content:space-between"><span class="hint num" id="camInfo">Ouverture de la caméra…</span>
+        <div class="row"><button class="btn" id="grava" disabled>⏺ Enregistrer</button><button class="btn ghost" id="fechaCam">Fermer</button></div></div>
+      <p class="hint">Astuce : 2 à 3 secondes suffisent par service. Plus la vitesse (images/s) est haute, plus la mesure est précise.</p>
+    </div>
+    <span class="hint" id="info"></span>
   </div>
 
   <div id="trab" hidden>
@@ -70,6 +77,8 @@ a{color:var(--table)}
         </select>
         <input type="number" id="refOutro" placeholder="cm" style="width:90px" hidden>
       </div>
+      <div class="row" style="margin-top:8px" id="fpsRow"><span class="hint">Vitesse réelle de la vidéo :</span><input type="number" id="fpsIn" placeholder="images/s" style="width:110px"><span class="hint">(si connue : permet l'échelle par la gravité)</span></div>
+      <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
@@ -99,14 +108,44 @@ let W = 0, H = 0, PASSO = 1/60;
 let fase = 0, cal = [], escala = null, traj = [], soltura = null, topo = null, manualFase = 0;
 const fmt = (n, d=1) => (Math.round(n*10**d)/10**d).toString().replace(".", ",");
 
-$("arq").onchange = e => {
-  const f = e.target.files[0]; if (!f) return;
+$("arq").onchange = e => { const f = e.target.files[0]; if (!f) return; FPS_REAL = null; PASSO = 1/60; abreVideo(f); };
+let FPS_REAL = null;
+function abreVideo(f){
   v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";
   v.onloadedmetadata = async () => {
     const lw = Math.min(720, v.videoWidth); W = lw; H = Math.round(v.videoHeight*lw/v.videoWidth);
     cv.width = W; cv.height = H; $("trab").hidden = false; $("info").textContent = `${v.videoWidth}×${v.videoHeight}, ${fmt(v.duration)} s`;
+    if (!isFinite(v.duration)){ v.currentTime = 1e9; await new Promise(r => v.addEventListener("timeupdate", r, {once: true})); }
+    $("info").textContent = `${v.videoWidth}×${v.videoHeight}, ${fmt(v.duration)} s${FPS_REAL ? ` · ${Math.round(FPS_REAL)} images/s` : ""}`;
     await vaiPara(0); reinicia(true);
   };
+}
+// ---- camera da propria app: HD (1280x720) a' maior velocidade que o telemovel permitir
+let stream = null, rec = null, pedacos = [];
+$("abreCam").onclick = async () => {
+  $("camZona").hidden = false; $("camInfo").textContent = "Ouverture de la caméra…";
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: "environment"}, width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 240}}});
+    const tr = stream.getVideoTracks()[0], cap = tr.getCapabilities ? tr.getCapabilities() : {};
+    if (cap.frameRate && cap.frameRate.max){
+      try { await tr.applyConstraints({width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: cap.frameRate.max}}); } catch(e){}
+    }
+    $("prev").srcObject = stream;
+    const st = tr.getSettings(); FPS_REAL = st.frameRate || 30;
+    $("camInfo").textContent = `${st.width}×${st.height} · ${Math.round(FPS_REAL)} images/s${cap.frameRate && cap.frameRate.max ? ` (max. ${Math.round(cap.frameRate.max)})` : ""}`;
+    $("grava").disabled = false;
+  } catch(e){ $("camInfo").textContent = "Caméra indisponible (autorise l'accès à la caméra) : " + e.name; }
+};
+function paraCam(){ if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; $("camZona").hidden = true; }
+$("fechaCam").onclick = paraCam;
+$("grava").onclick = () => {
+  if (rec && rec.state === "recording"){ rec.stop(); return; }
+  const tipos = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
+  const tipo = tipos.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || "";
+  pedacos = []; rec = new MediaRecorder(stream, {mimeType: tipo, videoBitsPerSecond: 16e6});
+  rec.ondataavailable = e => { if (e.data.size) pedacos.push(e.data); };
+  rec.onstop = () => { const b = new Blob(pedacos, {type: rec.mimeType || "video/webm"}); const fps = FPS_REAL; paraCam(); FPS_REAL = fps; PASSO = 1/Math.max(30, fps); abreVideo(b); $("grava").textContent = "⏺ Enregistrer"; };
+  rec.start(200); $("grava").textContent = "⏹ Arrêter";
 };
 function vaiPara(t){
   return new Promise(res => {
@@ -132,13 +171,16 @@ function texto(){
   if (fase === 0) $("passo").innerHTML = cal.length === 0 ? "2. Calibrage : touche le <b>premier point</b> du repère choisi (une fois par séance si la caméra ne bouge pas)." : "2. Touche le <b>second point</b> du repère.";
   else if (fase === 1) $("passo").innerHTML = manualFase === 1 ? "Mode manuel : va à l'image où la balle est <b>au plus haut</b> et touche-la." : "3. Avance jusqu'à l'image où la balle <b>quitte la main</b> et touche la balle.";
   else $("passo").innerHTML = "Résultat : la trajectoire est dessinée. Enregistre le service ou recommence.";
-  $("calRow").hidden = fase !== 0;
+  $("calRow").hidden = fase !== 0; $("gravRow").hidden = !(fase === 0 && FPS_REAL); $("fpsRow").hidden = fase !== 0;
+  if (FPS_REAL && document.activeElement !== $("fpsIn")) $("fpsIn").value = Math.round(FPS_REAL);
 }
 function reinicia(tudo){
   if (tudo){ cal = []; escala = null; fase = 0; } else fase = escala ? 1 : 0;
   traj = []; soltura = null; topo = null; manualFase = 0; $("resultado").hidden = true; $("estado").textContent = ""; texto(); desenha();
 }
 $("refazer").onclick = () => reinicia(false);
+$("fpsIn").oninput = () => { const f = parseFloat($("fpsIn").value); FPS_REAL = f > 0 ? f : null; if (FPS_REAL) PASSO = 1/FPS_REAL; texto(); };
+$("semRef").onclick = () => { escala = "g"; cal = []; fase = 1; $("estado").textContent = "Échelle calculée par la gravité (vidéo filmée dans l'appli)."; texto(); desenha(); };
 $("ref").onchange = () => { $("refOutro").hidden = $("ref").value !== "0"; };
 $("tempo").oninput = e => vaiPara(e.target.value/1000*(v.duration || 0));
 $("voltar").onclick = () => vaiPara(v.currentTime - PASSO);
@@ -204,16 +246,45 @@ async function segue(p){
   if (traj.length < 3 || soltura.y - topo.y < 3){ $("estado").textContent = "Balle perdue : essaie de toucher la balle plus précisément, ou utilise « Marquer à la main »."; topo = null; traj = []; desenha(); return; }
   await vaiPara(topo.t); mostraResultado();
 }
+function analisa(){
+  // ponto de lancamento: onde a velocidade de subida e' maxima (antes disso a mao ainda acelera a bola)
+  let iRel = 0;
+  // imagens repetidas (o navegador devolve por vezes a mesma imagem duas vezes ao avancar) saem da analise
+  const tp = traj.filter((p, i) => p.t != null && !(i && Math.abs(p.x - traj[i-1].x) < 0.01 && Math.abs(p.y - traj[i-1].y) < 0.01));
+  if (tp.length >= 6){
+    let vmax = 0;
+    // velocidade de subida em janelas de 2 intervalos; o lancamento e' o fim da janela mais rapida (fim do impulso da mao)
+    for (let i = 2; i < tp.length; i++){ const dt = tp[i].t - tp[i-2].t; if (dt <= 0) continue; const vy = (tp[i-2].y - tp[i].y)/dt; if (vy > vmax && tp[i].y > topo.y + 2){ vmax = vy; iRel = i === 2 ? 0 : i - 1; } }   // ja' a subir desde o inicio: o 1.o ponto
+  }
+  const rel = tp.length >= 6 ? tp[iRel] : soltura;
+  // escala pela gravidade: parabola y = a + b t + c t^2 depois do lancamento ate' ao topo (+2 imagens)
+  let pxcm_g = null;
+  const iTop = tp.indexOf(topo) >= 0 ? tp.indexOf(topo) : tp.length - 1;
+  const seg = tp.slice(iRel, Math.min(tp.length, iTop + 3));
+  if (FPS_REAL && seg.length >= 5){
+    const t0 = seg[0].t; let S = [0,0,0,0,0], R = [0,0,0];
+    seg.forEach(p => { const t = p.t - t0; S[0]++; S[1] += t; S[2] += t*t; S[3] += t*t*t; S[4] += t*t*t*t; R[0] += p.y; R[1] += p.y*t; R[2] += p.y*t*t; });
+    const M = [[S[0],S[1],S[2]],[S[1],S[2],S[3]],[S[2],S[3],S[4]]], det = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+    const D = det(M), Mc = M.map((r, i) => [r[0], r[1], R[i]]), c = det(Mc)/D;   // regra de Cramer para o termo t^2
+    if (c > 0) pxcm_g = 2*c/981;                         // y cresce para baixo: aceleracao = +2c px/s^2 = 981 cm/s^2
+  }
+  const cmpx = escala === "g" ? (pxcm_g ? 1/pxcm_g : null) : escala;
+  return {rel, cmpx, pxcm_g, vmaxCm: null, iRel, tp};
+}
 function mostraResultado(){
-  fase = 2; texto(); desenha();
-  const dy = (soltura.y - topo.y)*escala, dx = Math.abs(topo.x - soltura.x)*escala;
+  fase = 2; const A = analisa(); soltura = A.rel; texto(); desenha();
+  if (!A.cmpx){ $("estado").textContent = "Échelle impossible par la gravité (trop peu d'images) : fais le calibrage avec un repère."; return; }
+  const dy = (soltura.y - topo.y)*A.cmpx, dx = Math.abs(topo.x - soltura.x)*A.cmpx;
   const ang = Math.atan2(dx, dy)*180/Math.PI, tol = parseFloat($("tol").value) || 30;
+  const v0 = Math.sqrt(2*981*Math.max(dy, 0))/100;      // m/s, pela altura atingida
   ULTIMO = {alt: dy, ang};
   $("vAlt").textContent = `${fmt(dy)} cm`; $("vAng").textContent = `${fmt(ang)}°`;
   const okA = dy >= 16, okG = ang <= tol;
   $("rAlt").className = okA ? "ok" : "ko"; $("tAlt").textContent = okA ? "✅ ≥ 16 cm" : "❌ moins de 16 cm";
   $("rAng").className = okG ? "ok" : "ko"; $("tAng").textContent = okG ? `✅ ≤ ${tol}°` : `❌ plus de ${tol}°`;
-  $("resultado").hidden = false; $("estado").textContent = traj.length > 2 ? `${traj.length} images suivies.` : "Points marqués à la main.";
+  let extra = `Lâcher détecté à ${fmt(soltura.t ?? 0, 3)} s · vitesse de lancer ≈ ${fmt(v0, 2)} m/s · échelle : ${escala === "g" ? "gravité" : "repère"}`;
+  if (escala !== "g" && A.pxcm_g){ const altG = (soltura.y - topo.y)/A.pxcm_g; extra += ` · contrôle gravité : ${fmt(altG)} cm`; }
+  $("resultado").hidden = false; $("estado").textContent = (traj.length > 2 ? `${traj.length} images suivies. ` : "Points marqués à la main. ") + extra;
 }
 let ULTIMO = null;
 $("tol").oninput = () => { if (fase === 2) mostraResultado(); };
