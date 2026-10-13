@@ -46,7 +46,31 @@ a{color:var(--table)}
   <h1><i></i>Contrôle du service</h1>
   <p class="hint">Hauteur et angle du lancer de balle (règle ITTF : lancer presque vertical, au moins 16 cm). <a href="../">← Ping Virtual</a></p>
 
-  <div class="card">
+  <div class="card" style="border:2px solid var(--ball)">
+    <div class="etapa">⚡ Mode direct : la caméra suit chaque lancer, feu <b style="color:var(--win)">vert</b> ou <b style="color:var(--loss)">rouge</b>, et enregistre la séance avec l'analyse à l'écran.</div>
+    <div class="row"><button class="btn" id="dirAbre">Démarrer le mode direct</button></div>
+  </div>
+  <div id="dir" hidden style="position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column">
+    <div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
+      <canvas id="dirCv" style="max-width:100%;max-height:100%;width:auto;height:auto"></canvas>
+      <div id="dirFlash" style="position:absolute;inset:0;pointer-events:none;border:0 solid transparent;transition:border-width .15s"></div>
+      <div id="dirMsg" style="position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:10px;right:10px;color:#fff;font:600 14px Barlow,sans-serif;text-shadow:0 1px 3px #000"></div>
+    </div>
+    <div style="background:#111;color:#fff;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="dirRec">⏺ Enregistrer</button>
+      <button class="btn ghost" id="dirCor" style="color:#fff">🎯 Couleur balle</button>
+      <span id="dirCont" class="num" style="font:700 18px 'Barlow Condensed',sans-serif">0 service</span>
+      <button class="btn ghost" id="dirFim" style="color:#fff;margin-left:auto">Terminer</button>
+    </div>
+  </div>
+  <div id="rever" hidden class="card" style="margin-top:12px">
+    <div class="etapa">🎬 Revoir la séance</div>
+    <video id="reverV" controls playsinline style="width:100%;border-radius:10px;background:#000"></video>
+    <div id="reverLista" class="row" style="margin-top:8px"></div>
+    <div class="row" style="margin-top:8px"><a class="btn ghost" id="reverDown" download="seance-services.webm">💾 Enregistrer la vidéo</a></div>
+  </div>
+
+  <div class="card" style="margin-top:12px">
     <div class="etapa">1. Filme le service <b>de côté</b>, téléphone posé, ou choisis une vidéo.</div>
     <div class="row"><button class="btn" id="abreCam">🎥 Filmer (HD, haute vitesse)</button>
       <label class="btn ghost" style="cursor:pointer">📁 Choisir une vidéo<input type="file" id="arq" accept="video/*" hidden></label></div>
@@ -288,6 +312,142 @@ function mostraResultado(){
 }
 let ULTIMO = null;
 $("tol").oninput = () => { if (fase === 2) mostraResultado(); };
+
+// ---------------------------------------------------------------- MODO DIRETO
+// Cada imagem da camara (requestVideoFrameCallback, com o tempo exato da imagem) e' reduzida e analisada: pixeis com a
+// cor da bola que mudaram desde a imagem anterior -> posicao da bola. Uma subida seguida de descida = um lancamento:
+// lancamento no fim do impulso (velocidade maxima), topo, escala pela gravidade (9,81 m/s2) -> altura e angulo.
+const D = {on:false, st:null, vid:null, cv:null, cx:null, low:null, lx:null, prev:null, cor:[255,122,26], escolheCor:false,
+           pts:[], ult:null, rec:null, partes:[], t0rec:null, servs:[], fpsFonte:30};
+const LW = 240;   // largura da analise
+$("dirAbre").onclick = async () => {
+  try {
+    D.st = await navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:240}}});
+  } catch(e){ alert("Caméra indisponible : " + e.name); return; }
+  const tr = D.st.getVideoTracks()[0], cap = tr.getCapabilities ? tr.getCapabilities() : {};
+  if (cap.frameRate && cap.frameRate.max){ try { await tr.applyConstraints({width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:cap.frameRate.max}}); } catch(e){} }
+  D.vid = document.createElement("video"); D.vid.muted = true; D.vid.playsInline = true; D.vid.srcObject = D.st; await D.vid.play();
+  const sset = tr.getSettings(); D.fpsFonte = sset.frameRate || 30;
+  D.cv = $("dirCv"); D.cv.width = D.vid.videoWidth; D.cv.height = D.vid.videoHeight; D.cx = D.cv.getContext("2d");
+  D.low = document.createElement("canvas"); D.low.width = LW; D.low.height = Math.round(LW*D.vid.videoHeight/D.vid.videoWidth);
+  D.lx = D.low.getContext("2d", {willReadFrequently:true});
+  D.on = true; D.servs = []; D.pts = []; D.ult = null; $("dir").hidden = false; $("dirCont").textContent = "0 service";
+  $("dirMsg").textContent = `${D.vid.videoWidth}×${D.vid.videoHeight} · ${Math.round(D.fpsFonte)} images/s — filme de côté, puis lance la balle. Touche « 🎯 » puis la balle si elle n'est pas orange.`;
+  try { await navigator.wakeLock.request("screen"); } catch(e){}
+  D.vid.requestVideoFrameCallback(quadro);
+};
+$("dirCor").onclick = () => { D.escolheCor = true; $("dirMsg").textContent = "Touche la balle à l'écran pour apprendre sa couleur."; };
+$("dirCv").addEventListener("pointerdown", e => {
+  if (!D.escolheCor) return;
+  const r = D.cv.getBoundingClientRect(), x = (e.clientX - r.left)/r.width*D.low.width, y = (e.clientY - r.top)/r.height*D.low.height;
+  const im = D.lx.getImageData(0, 0, D.low.width, D.low.height).data; let c = [0,0,0], n = 0;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++){ const i = ((Math.round(y)+dy)*D.low.width + Math.round(x)+dx)*4; c[0] += im[i]; c[1] += im[i+1]; c[2] += im[i+2]; n++; }
+  D.cor = c.map(v => v/n); D.escolheCor = false; $("dirMsg").textContent = "Couleur de la balle apprise ✓";
+});
+function quadro(agora, meta){
+  if (!D.on) return;
+  const t = meta.mediaTime ?? agora/1000, W = D.low.width, H = D.low.height;
+  D.lx.drawImage(D.vid, 0, 0, W, H);
+  const im = D.lx.getImageData(0, 0, W, H).data;
+  // bola: cor parecida + movimento
+  let sx = 0, sy = 0, n = 0;
+  if (D.prev){
+    for (let i = 0, p = 0; i < im.length; i += 4, p++){
+      const dc = Math.abs(im[i]-D.cor[0]) + Math.abs(im[i+1]-D.cor[1]) + Math.abs(im[i+2]-D.cor[2]);
+      if (dc < 110){ const dm = Math.abs(im[i]-D.prev[i]) + Math.abs(im[i+1]-D.prev[i+1]) + Math.abs(im[i+2]-D.prev[i+2]); if (dm > 40){ sx += p % W; sy += (p / W) | 0; n++; } }
+    }
+  }
+  D.prev = im;
+  if (n >= 2 && n < W*H/150){
+    const p = {t, x: sx/n, y: sy/n};
+    const u = D.pts[D.pts.length - 1];
+    if (u && (t - u.t > 0.25 || Math.hypot(p.x - u.x, p.y - u.y) > W/4)) D.pts = [];   // salto: outra coisa / novo lancamento
+    D.pts.push(p); if (D.pts.length > 120) D.pts.shift();
+    detetaServico();
+  } else if (D.pts.length && t - D.pts[D.pts.length - 1].t > 0.3) D.pts = [];
+  desenhaDireto(t);
+  D.vid.requestVideoFrameCallback(quadro);
+}
+function detetaServico(){
+  const P = D.pts; if (P.length < 6) return;
+  // topo: o ponto mais alto, seguido de 2 pontos a descer
+  let iTop = 0; P.forEach((p, i) => { if (p.y < P[iTop].y) iTop = i; });
+  if (iTop < 3 || P.length - 1 - iTop < 2 || P[P.length-1].y <= P[iTop].y + 1) return;
+  // lancamento: fim da janela de subida mais rapida antes do topo
+  let vmax = 0, iRel = 0;
+  for (let i = 2; i <= iTop; i++){ const dt = P[i].t - P[i-2].t; if (dt <= 0) continue; const vy = (P[i-2].y - P[i].y)/dt; if (vy > vmax){ vmax = vy; iRel = i === 2 ? 0 : i - 1; } }
+  if (iTop - iRel < 4){ D.pts = []; return; }                    // subida com poucas imagens: nao e' um lancamento
+  const seg = P.slice(iRel, Math.min(P.length, iTop + 3));
+  // escala pela gravidade (y = a + b t + c t^2, em px da analise)
+  const t0 = seg[0].t; let S = [0,0,0,0,0], R = [0,0,0];
+  seg.forEach(p => { const tt = p.t - t0; S[0]++; S[1] += tt; S[2] += tt*tt; S[3] += tt**3; S[4] += tt**4; R[0] += p.y; R[1] += p.y*tt; R[2] += p.y*tt*tt; });
+  const M = [[S[0],S[1],S[2]],[S[1],S[2],S[3]],[S[2],S[3],S[4]]], det = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+  const c = det(M.map((r, i) => [r[0], r[1], R[i]]))/det(M);
+  const pxcm = 2*c/981;
+  const rel = P[iRel], top = P[iTop];
+  D.pts = [];
+  if (!(pxcm > 0.05 && pxcm < 20)) return;                       // nao e' um lancamento (ex.: mao a mexer)
+  const alt = (rel.y - top.y)/pxcm, lat = Math.abs(top.x - rel.x)/pxcm, ang = Math.atan2(lat, Math.max(alt, 0.01))*180/Math.PI;
+  if (alt < 4 || alt > 150) return;
+  const tol = parseFloat($("tol").value) || 30, ok = alt >= 16 && ang <= tol;
+  const sv = {alt, ang, ok, rel, top, traj: seg.slice(), quando: performance.now(), tRec: D.rec && D.t0rec != null ? (performance.now() - D.t0rec)/1000 : null};
+  D.servs.push(sv); D.ult = sv;
+  $("dirCont").textContent = `${D.servs.length} service${D.servs.length > 1 ? "s" : ""} · ${D.servs.filter(x => x.ok).length} ✅`;
+  sinal(ok);
+  const h = hist(); h.push({alt, ang, d: Date.now()}); guarda(h); mostraHist();
+}
+function sinal(ok){
+  const f = $("dirFlash"); f.style.borderColor = ok ? "#22c55e" : "#ef4444"; f.style.borderWidth = "18px";
+  setTimeout(() => { f.style.borderWidth = "0"; }, 1500);
+  try { navigator.vibrate(ok ? 120 : [80, 60, 80, 60, 80]); } catch(e){}
+  try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain(); o.frequency.value = ok ? 880 : 220; g.gain.value = 0.15; o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + (ok ? 0.15 : 0.4)); } catch(e){}
+}
+function desenhaDireto(t){
+  const cx = D.cx, W = D.cv.width, H = D.cv.height, k = W/D.low.width;
+  cx.drawImage(D.vid, 0, 0, W, H);
+  // ultimo servico, a' maneira do TTR, durante 4 s
+  const s = D.ult;
+  if (s && performance.now() - s.quando < 4000){
+    cx.lineWidth = Math.max(3, W/300); cx.strokeStyle = "#ff7a1a"; cx.beginPath(); s.traj.forEach((p, i) => i ? cx.lineTo(p.x*k, p.y*k) : cx.moveTo(p.x*k, p.y*k)); cx.stroke();
+    cx.setLineDash([10, 8]); cx.strokeStyle = "#fff"; cx.beginPath(); cx.moveTo(s.rel.x*k, s.rel.y*k); cx.lineTo(s.rel.x*k, s.top.y*k); cx.lineTo(s.top.x*k, s.top.y*k); cx.stroke(); cx.setLineDash([]);
+    [[s.rel, "#fff"], [s.top, "#ff7a1a"]].forEach(([p, c]) => { cx.strokeStyle = c; cx.beginPath(); cx.arc(p.x*k, p.y*k, W/70, 0, 7); cx.stroke(); });
+    const bw = Math.min(W*0.62, 520), bh = bw*0.32, x0 = Math.round(W*0.05) + 10, y0 = Math.round(H*0.06) + 10;
+    cx.fillStyle = "rgba(10,14,24,.82)"; cx.fillRect(x0, y0, bw, bh);
+    cx.fillStyle = s.ok ? "#22c55e" : "#ef4444"; cx.fillRect(x0, y0, bw*0.035, bh);
+    cx.fillStyle = "#fff"; cx.font = `800 italic ${bh*0.22}px 'Barlow Condensed',sans-serif`; cx.fillText("TOSS REVIEW", x0 + bw*0.07, y0 + bh*0.3);
+    cx.font = `700 ${bh*0.3}px 'Barlow Condensed',sans-serif`;
+    cx.fillStyle = s.alt >= 16 ? "#4ade80" : "#f87171"; cx.fillText(`${fmt(s.alt)} cm`, x0 + bw*0.07, y0 + bh*0.72);
+    cx.fillStyle = s.ang <= (parseFloat($("tol").value) || 30) ? "#4ade80" : "#f87171"; cx.fillText(`${fmt(s.ang)}°`, x0 + bw*0.55, y0 + bh*0.72);
+    cx.fillStyle = "#cbd5e1"; cx.font = `600 ${bh*0.13}px Barlow,sans-serif`; cx.fillText("hauteur ≥ 16 cm", x0 + bw*0.07, y0 + bh*0.92); cx.fillText(`angle ≤ ${parseFloat($("tol").value) || 30}°`, x0 + bw*0.55, y0 + bh*0.92);
+  }
+  // bola seguida agora
+  const u = D.pts[D.pts.length - 1];
+  if (u){ cx.strokeStyle = "#ffd60a"; cx.lineWidth = 3; cx.beginPath(); cx.arc(u.x*k, u.y*k, W/90, 0, 7); cx.stroke(); }
+  if (D.rec){ cx.fillStyle = "#ef4444"; cx.beginPath(); cx.arc(W - 24, 24, 9, 0, 7); cx.fill(); }
+}
+$("dirRec").onclick = () => {
+  if (D.rec){ D.rec.stop(); return; }
+  const fps = Math.min(60, Math.round(D.fpsFonte)), st = D.cv.captureStream(fps);
+  const tipos = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm"];
+  const tipo = tipos.find(x => window.MediaRecorder && MediaRecorder.isTypeSupported(x)) || "";
+  D.partes = []; D.rec = new MediaRecorder(st, {mimeType: tipo, videoBitsPerSecond: 8e6}); D.t0rec = performance.now();
+  D.servs.forEach(s => s.tRec = null);
+  D.rec.ondataavailable = e => { if (e.data.size) D.partes.push(e.data); };
+  D.rec.onstop = () => {
+    const b = new Blob(D.partes, {type: D.rec.mimeType || "video/webm"}), url = URL.createObjectURL(b);
+    $("reverV").src = url; $("reverDown").href = url; $("reverDown").download = "seance-services." + (b.type.includes("mp4") ? "mp4" : "webm");
+    const ss = D.servs.filter(s => s.tRec != null);
+    $("reverLista").innerHTML = ss.map((s, i) => `<button class="btn ghost" data-t="${Math.max(0, s.tRec - 2).toFixed(2)}" style="border-color:${s.ok ? "var(--win)" : "var(--loss)"}">${s.ok ? "✅" : "❌"} #${i + 1} · ${fmt(s.alt)} cm · ${fmt(s.ang)}°</button>`).join("") || `<span class="hint">Aucun service détecté pendant l'enregistrement.</span>`;
+    $("reverLista").querySelectorAll("[data-t]").forEach(bt => bt.onclick = () => { $("reverV").currentTime = parseFloat(bt.dataset.t); $("reverV").play(); });
+    $("rever").hidden = false; D.rec = null; $("dirRec").textContent = "⏺ Enregistrer";
+  };
+  D.rec.start(500); $("dirRec").textContent = "⏹ Arrêter l'enregistrement";
+};
+$("dirFim").onclick = () => {
+  if (D.rec) D.rec.stop();
+  D.on = false; if (D.st) D.st.getTracks().forEach(t => t.stop()); $("dir").hidden = true;
+  setTimeout(() => { if (!$("rever").hidden) $("rever").scrollIntoView({behavior: "smooth"}); }, 300);
+};
 
 // ---- sessao (guardada no telemovel)
 const CLE = "pingvirtual.services";
