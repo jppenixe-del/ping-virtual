@@ -134,16 +134,49 @@ const fmt = (n, d=1) => (Math.round(n*10**d)/10**d).toString().replace(".", ",")
 
 $("arq").onchange = e => { const f = e.target.files[0]; if (!f) return; FPS_REAL = null; PASSO = 1/60; abreVideo(f); };
 let FPS_REAL = null;
+// Todas as imagens do video ficam em memoria (extraidas uma vez, a tocar o video devagar): assim anda-se para a frente
+// e para tras sem depender do "seek" do navegador (que em muitos videos de telemovel so' funciona para a frente).
+let QUAD = [], idx = 0;
+const MAXQ = 900;
 function abreVideo(f){
+  QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
   v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";
   v.onloadedmetadata = async () => {
-    const lw = Math.min(720, v.videoWidth); W = lw; H = Math.round(v.videoHeight*lw/v.videoWidth);
-    cv.width = W; cv.height = H; $("trab").hidden = false; $("info").textContent = `${v.videoWidth}×${v.videoHeight}, ${fmt(v.duration)} s`;
-    if (!isFinite(v.duration)){ v.currentTime = 1e9; await new Promise(r => v.addEventListener("timeupdate", r, {once: true})); }
-    $("info").textContent = `${v.videoWidth}×${v.videoHeight}, ${fmt(v.duration)} s${FPS_REAL ? ` · ${Math.round(FPS_REAL)} images/s` : ""}`;
-    await vaiPara(0); reinicia(true);
+    const lw = Math.min(640, v.videoWidth); W = lw; H = Math.round(v.videoHeight*lw/v.videoWidth);
+    cv.width = W; cv.height = H;
+    await extrai();
+    const dts = QUAD.slice(1).map((q, i) => q.t - QUAD[i].t).filter(d => d > 0).sort((a, b) => a - b);
+    const fpsArq = dts.length ? 1/dts[Math.floor(dts.length/2)] : null;
+    $("trab").hidden = false;
+    $("info").textContent = `${v.videoWidth}×${v.videoHeight} · ${QUAD.length} images${fpsArq ? ` · ${Math.round(fpsArq)} images/s` : ""}${QUAD.length >= MAXQ ? " · (vidéo longue : seules les premières secondes)" : ""}`;
+    if (!FPS_REAL && fpsArq) $("fpsIn").placeholder = `${Math.round(fpsArq)} ?`;
+    mostra(0); reinicia(true);
   };
 }
+function extrai(){
+  return new Promise(async res => {
+    const fim = () => { v.pause(); res(); };
+    if (!("requestVideoFrameCallback" in HTMLVideoElement.prototype)){   // sem rVFC: extrair por saltos, para a frente
+      const dt = 1/60; for (let t = 0; t < (isFinite(v.duration) ? v.duration : 10) && QUAD.length < MAXQ; t += dt){
+        await new Promise(r => { v.addEventListener("seeked", r, {once: true}); v.currentTime = t; });
+        QUAD.push({t, bmp: await createImageBitmap(v, {resizeWidth: W, resizeHeight: H})});
+        if (QUAD.length % 20 === 0) $("info").textContent = `Préparation de la vidéo… ${QUAD.length} images`;
+      }
+      return res();
+    }
+    v.muted = true; v.playbackRate = 0.25;                       // devagar: nenhuma imagem se perde, mesmo em 120-240 i/s
+    const cada = async (agora, meta) => {
+      QUAD.push({t: meta.mediaTime, bmp: await createImageBitmap(v, {resizeWidth: W, resizeHeight: H})});
+      if (QUAD.length % 15 === 0) $("info").textContent = `Préparation de la vidéo… ${QUAD.length} images`;
+      if (QUAD.length >= MAXQ || v.ended) return fim();
+      v.requestVideoFrameCallback(cada);
+    };
+    v.onended = fim;
+    v.requestVideoFrameCallback(cada);
+    try { v.currentTime = 0; await v.play(); } catch(e){ fim(); }
+  });
+}
+function mostra(i){ idx = Math.max(0, Math.min(QUAD.length - 1, i)); desenha(); }
 // ---- camera da propria app: HD (1280x720) a' maior velocidade que o telemovel permitir
 let stream = null, rec = null, pedacos = [];
 $("abreCam").onclick = async () => {
@@ -171,16 +204,13 @@ $("grava").onclick = () => {
   rec.onstop = () => { const b = new Blob(pedacos, {type: rec.mimeType || "video/webm"}); const fps = FPS_REAL; paraCam(); FPS_REAL = fps; PASSO = 1/Math.max(30, fps); abreVideo(b); $("grava").textContent = "⏺ Enregistrer"; };
   rec.start(200); $("grava").textContent = "⏹ Arrêter";
 };
-function vaiPara(t){
-  return new Promise(res => {
-    t = Math.max(0, Math.min(v.duration || 0, t));
-    const fim = () => { v.removeEventListener("seeked", fim); desenha(); res(); };
-    v.addEventListener("seeked", fim); v.currentTime = t;
-  });
+function vaiPara(t){       // a imagem mais proxima do tempo t
+  let m = 0; QUAD.forEach((q, i) => { if (Math.abs(q.t - t) < Math.abs(QUAD[m].t - t)) m = i; }); mostra(m); return Promise.resolve();
 }
+const agoraT = () => QUAD[idx] ? QUAD[idx].t : 0;
 function desenha(){
-  cx.drawImage(v, 0, 0, W, H);
-  $("tempo").value = Math.round(1000*v.currentTime/(v.duration || 1)); $("tTxt").textContent = `${fmt(v.currentTime, 2)} s`;
+  if (QUAD[idx]) cx.drawImage(QUAD[idx].bmp, 0, 0, W, H);
+  $("tempo").value = QUAD.length > 1 ? Math.round(1000*idx/(QUAD.length - 1)) : 0; $("tTxt").textContent = `${fmt(agoraT(), 2)} s · image ${idx + 1}/${QUAD.length}`;
   // repere de calibracao
   if (cal.length){ cx.strokeStyle = "#3ec1ff"; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(cal[0].x, cal[0].y); if (cal[1]) cx.lineTo(cal[1].x, cal[1].y); cx.stroke(); cal.forEach(p => { cx.fillStyle = "#3ec1ff"; cx.beginPath(); cx.arc(p.x, p.y, 5, 0, 7); cx.fill(); }); }
   // trajetoria
@@ -206,9 +236,9 @@ $("refazer").onclick = () => reinicia(false);
 $("fpsIn").oninput = () => { const f = parseFloat($("fpsIn").value); FPS_REAL = f > 0 ? f : null; if (FPS_REAL) PASSO = 1/FPS_REAL; texto(); };
 $("semRef").onclick = () => { escala = "g"; cal = []; fase = 1; $("estado").textContent = "Échelle calculée par la gravité (vidéo filmée dans l'appli)."; texto(); desenha(); };
 $("ref").onchange = () => { $("refOutro").hidden = $("ref").value !== "0"; };
-$("tempo").oninput = e => vaiPara(e.target.value/1000*(v.duration || 0));
-$("voltar").onclick = () => vaiPara(v.currentTime - PASSO);
-$("avancar").onclick = () => vaiPara(v.currentTime + PASSO);
+$("tempo").oninput = e => mostra(Math.round(e.target.value/1000*(QUAD.length - 1)));
+$("voltar").onclick = () => mostra(idx - 1);
+$("avancar").onclick = () => mostra(idx + 1);
 $("manual").onclick = () => { if (!escala) { $("estado").textContent = "Fais d'abord le calibrage."; return; } fase = 1; manualFase = 0; traj = []; soltura = null; topo = null; $("estado").textContent = "Mode manuel : touche la balle quand elle quitte la main, puis au point le plus haut."; manualFase = -1; texto(); desenha(); };
 
 function pos(e){ const r = cv.getBoundingClientRect(); return {x: (e.clientX - r.left)*W/r.width, y: (e.clientY - r.top)*H/r.height}; }
@@ -224,8 +254,8 @@ cv.addEventListener("pointerdown", async e => {
     }
     texto(); return;
   }
-  if (fase === 1 && manualFase === -1){ soltura = {...p, t: v.currentTime}; manualFase = 1; texto(); desenha(); return; }
-  if (fase === 1 && manualFase === 1){ topo = {...p, t: v.currentTime}; traj = [soltura, topo]; mostraResultado(); return; }
+  if (fase === 1 && manualFase === -1){ soltura = {...p, t: agoraT()}; manualFase = 1; texto(); desenha(); return; }
+  if (fase === 1 && manualFase === 1){ topo = {...p, t: agoraT()}; traj = [soltura, topo]; mostraResultado(); return; }
   if (fase === 1){ await segue(p); }
 });
 
@@ -250,19 +280,18 @@ function procura(img, cor, px, py, raio, tol){
 }
 async function segue(p){
   $("estado").textContent = "Suivi de la balle…";
-  const t0 = v.currentTime;
+  const t0 = agoraT(), i0 = idx;
   let img = cx.getImageData(0, 0, W, H).data;
   const cor = amostraCor(img, p.x, p.y);
   let atual = procura(img, cor, p.x, p.y, 14, 90) || {...p, r: 6};
   soltura = {...atual, t: t0}; traj = [soltura];
   let vel = {x: 0, y: 0}, perdidos = 0, melhor = soltura;
-  for (let k = 1; k < 400; k++){
-    await vaiPara(t0 + k*PASSO); if (v.currentTime >= v.duration - 0.001) break;
-    cx.drawImage(v, 0, 0, W, H); img = cx.getImageData(0, 0, W, H).data;
+  for (let k = i0 + 1; k < QUAD.length && k < i0 + 600; k++){
+    cx.drawImage(QUAD[k].bmp, 0, 0, W, H); img = cx.getImageData(0, 0, W, H).data;
     const prev = {x: atual.x + vel.x, y: atual.y + vel.y}, raio = Math.max(25, Math.hypot(vel.x, vel.y)*2.5);
     const q = procura(img, cor, prev.x, prev.y, raio, 90);
     if (!q){ if (++perdidos > 4) break; atual = {...atual, x: prev.x, y: prev.y}; continue; }
-    perdidos = 0; vel = {x: q.x - atual.x, y: q.y - atual.y}; atual = {...q, t: v.currentTime}; traj.push(atual);
+    perdidos = 0; vel = {x: q.x - atual.x, y: q.y - atual.y}; atual = {...q, t: QUAD[k].t}; traj.push(atual);
     if (atual.y < melhor.y) melhor = atual;
     if (atual.y > soltura.y + 4 && melhor.y < soltura.y - 5) break;          // ja' desceu abaixo do ponto de partida
   }
