@@ -105,6 +105,7 @@ a{color:var(--table)}
       </div>
       <div class="row" style="margin-top:8px" id="fpsRow"><span class="hint">Vitesse réelle de la vidéo :</span><input type="number" id="fpsIn" placeholder="images/s" style="width:110px"><span class="hint">(si connue : permet l'échelle par la gravité)</span></div>
       <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique</button></div>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
@@ -315,13 +316,14 @@ function procura(img, cor, px, py, raio, tol){
   }
   return n >= 6 ? {x: sx/n, y: sy/n, n, r: Math.sqrt(n/Math.PI)} : null;
 }
-function manchas(img, ant, cor, px, py, raio, tol, area){
+function manchas(img, ant, cor, px, py, raio, tol, area, soMov){
   const x0 = Math.max(0, Math.floor(px - raio)), x1 = Math.min(W - 1, Math.ceil(px + raio));
   const y0 = Math.max(0, Math.floor(py - raio)), y1 = Math.min(H - 1, Math.ceil(py + raio));
   const w = x1 - x0 + 1, h = y1 - y0 + 1, m = new Uint8Array(w*h);
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){
     const i = (y*W + x)*4;
-    if (Math.abs(img[i] - cor[0]) + Math.abs(img[i+1] - cor[1]) + Math.abs(img[i+2] - cor[2]) < tol) m[(y - y0)*w + (x - x0)] = 1;
+    if (Math.abs(img[i] - cor[0]) + Math.abs(img[i+1] - cor[1]) + Math.abs(img[i+2] - cor[2]) < tol &&
+        (!soMov || Math.abs(img[i] - soMov[i]) + Math.abs(img[i+1] - soMov[i+1]) + Math.abs(img[i+2] - soMov[i+2]) > 45)) m[(y - y0)*w + (x - x0)] = 1;
   }
   const out = [];
   for (let k = 0; k < m.length; k++){
@@ -333,7 +335,7 @@ function manchas(img, ant, cor, px, py, raio, tol, area){
       if (x > 0 && m[q-1] === 1){ m[q-1] = 2; pilha.push(q-1); } if (x < w-1 && m[q+1] === 1){ m[q+1] = 2; pilha.push(q+1); }
       if (y > 0 && m[q-w] === 1){ m[q-w] = 2; pilha.push(q-w); } if (y < h-1 && m[q+w] === 1){ m[q+w] = 2; pilha.push(q+w); }
     }
-    if (area && (n < area*0.25 || n > area*3)) continue;          // do tamanho da bola (com margem para o desfocado)
+    if (area && (n < area*(soMov ? 0.12 : 0.25) || n > area*3)) continue;   // do tamanho da bola (com margem para o desfocado)
     if (!area && n < 6) continue;
     out.push({x: sx/n + x0, y: sy/n + y0, n, mov: mov/n, r: Math.sqrt(n/Math.PI)});
   }
@@ -344,7 +346,7 @@ function melhor(cands, px, py){
   cands.forEach(c => { const sc = Math.hypot(c.x - px, c.y - py)*(c.mov > 0.15 ? 0.6 : 1); if (sc < bs){ bs = sc; b = c; } });
   return b;
 }
-async function segue(p){
+async function segue(p, silencioso){
   $("estado").textContent = "Suivi de la balle…";
   const t0 = agoraT(), i0 = idx;
   let img = cx.getImageData(0, 0, W, H).data;
@@ -353,14 +355,19 @@ async function segue(p){
   const ini = melhor(manchas(img, null, cor, p.x, p.y, 30, 80, 0), p.x, p.y);
   let atual = ini ? {...ini} : {...p, r: 6}; const area = ini ? ini.n : 0;
   soltura = {...atual, t: t0}; traj = [soltura];
-  let vel = {x: 0, y: 0}, perdidos = 0, alto = soltura, ant = img;
+  let vel = {x: 0, y: 0}, perdidos = 0, alto = soltura, ant = img; const hist3 = [img];
   for (let k = i0 + 1; k < QUAD.length && k < i0 + 600; k++){
     cx.drawImage(QUAD[k].bmp, 0, 0, W, H); img = cx.getImageData(0, 0, W, H).data;
     // previsao: velocidade + travagem medida nas ultimas imagens (a bola em voo segue a curva da gravidade)
     const n = traj.length, ay = n >= 4 ? ((traj[n-1].y - traj[n-2].y) - (traj[n-3].y - traj[n-4].y))/2 : 0;
     if (perdidos) vel = {x: vel.x, y: vel.y + Math.max(0, ay)};
     const prev = {x: atual.x + vel.x, y: atual.y + vel.y}, raio = Math.max(18, Math.hypot(vel.x, vel.y)*2 + (atual.r || 6)*2 + perdidos*4);
-    const q = melhor(manchas(img, ant, cor, prev.x, prev.y, raio, 95, area), prev.x, prev.y); ant = img;
+    // 1.o: so' manchas que se mexeram desde ha' 3 imagens (ignora o fundo parado: pontos brancos, luzes, letreiros)
+    const velha = hist3.length >= 3 ? hist3[hist3.length - 3] : hist3[0];
+    let q = melhor(manchas(img, ant, cor, prev.x, prev.y, raio, 110, area, velha), prev.x, prev.y);
+    // 2.o: perto do topo a bola quase nao se mexe -> pela cor, mas so' muito perto da previsao
+    if (!q && Math.abs(vel.y) < 6) q = melhor(manchas(img, ant, cor, prev.x, prev.y, Math.max(10, (atual.r || 6)*1.5), 95, area), prev.x, prev.y);
+    ant = img; hist3.push(img); if (hist3.length > 4) hist3.shift();
     // escondida (atras de algo da mesma cor, ou desfocada): segue a curva prevista ate' 15 imagens e volta a procurar
     if (!q){ if (++perdidos > 15) break; atual = {...atual, x: prev.x, y: prev.y}; continue; }
     if (perdidos && Math.hypot(q.x - prev.x, q.y - prev.y) > raio*0.6){ if (++perdidos > 15) break; atual = {...atual, x: prev.x, y: prev.y}; continue; }   // nao bate com a trajetoria
@@ -372,7 +379,7 @@ async function segue(p){
     if (atual.y > soltura.y + 4 && alto.y < soltura.y - 5) break;          // ja' desceu abaixo do ponto de partida
   }
   topo = alto;
-  if (traj.length < 3 || soltura.y - topo.y < 3){ $("estado").textContent = "Balle perdue : essaie de toucher la balle plus précisément, ou utilise « Marquer à la main »."; topo = null; traj = []; desenha(); return; }
+  if (traj.length < 3 || soltura.y - topo.y < 3){ if (silencioso){ traj = []; topo = null; return; } $("estado").textContent = "Balle perdue : essaie de toucher la balle plus précisément, ou utilise « Marquer à la main »."; topo = null; traj = []; desenha(); return; }
   await vaiPara(topo.t); mostraResultado();
 }
 function analisa(){
@@ -582,6 +589,80 @@ $("dirFim").onclick = () => {
   D.on = false; if (D.st) D.st.getTracks().forEach(t => t.stop()); $("dir").hidden = true;
   setTimeout(() => { if (!$("rever").hidden) $("rever").scrollIntoView({behavior: "smooth"}); }, 300);
 };
+
+// ---------------------------------------------------------------- DETECAO AUTOMATICA
+// Sem tocar na bola: em cada imagem, as manchas que mudaram (diferenca com 2 imagens antes) com tamanho e forma de bola;
+// ligam-se em trajetorias; escolhe-se a que sobe e trava como uma bola em queda livre (parabola com a concavidade certa).
+async function autoDeteta(){
+  if (QUAD.length < 8){ $("estado").textContent = "Vidéo trop courte."; return; }
+  $("estado").textContent = "Recherche de la balle…";
+  const LW2 = Math.min(W, 480), LH2 = Math.round(H*LW2/W), k2 = W/LW2;
+  const cvs = document.createElement("canvas"); cvs.width = LW2; cvs.height = LH2; const c2 = cvs.getContext("2d", {willReadFrequently: true});
+  const cinza = i => { c2.drawImage(QUAD[i].bmp, 0, 0, LW2, LH2); const d = c2.getImageData(0, 0, LW2, LH2).data, g = new Uint8Array(LW2*LH2); for (let p = 0, j = 0; p < g.length; p++, j += 4) g[p] = (d[j] + d[j+1] + d[j+2])/3; return g; };
+  const G = []; let tracks = [], fechadas = [];
+  for (let i = 0; i < QUAD.length; i++){
+    G[i] = cinza(i); if (i < 2){ continue; }
+    const a = G[i], b = G[i-2], m = new Uint8Array(a.length);
+    for (let p = 0; p < a.length; p++) if (a[p] - b[p] > 25) m[p] = 1;    // so' o que ficou mais claro (a bola chegou ali)
+    const comps = [];
+    for (let p = 0; p < m.length; p++){
+      if (m[p] !== 1) continue;
+      let n = 0, sx = 0, sy = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1; const pil = [p]; m[p] = 2;
+      while (pil.length){ const q = pil.pop(), x = q % LW2, y = (q / LW2) | 0; n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        if (x > 0 && m[q-1] === 1){ m[q-1] = 2; pil.push(q-1); } if (x < LW2-1 && m[q+1] === 1){ m[q+1] = 2; pil.push(q+1); }
+        if (y > 0 && m[q-LW2] === 1){ m[q-LW2] = 2; pil.push(q-LW2); } if (y < LH2-1 && m[q+LW2] === 1){ m[q+LW2] = 2; pil.push(q+LW2); } }
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+      if (n < 3 || n > 1400 || bw > 3*bh + 3 || bh > 3*bw + 3 || n < 0.3*bw*bh) continue;   // pequena e redonda (o rasto do movimento alonga um pouco)
+      comps.push({x: sx/n, y: sy/n, n, t: QUAD[i].t, i});
+    }
+    // ligar as manchas as trajetorias abertas (pela posicao prevista)
+    const usadas = new Set();
+    tracks.forEach(tr => {
+      const u = tr.p[tr.p.length - 1], v = tr.p.length > 1 ? {x: u.x - tr.p[tr.p.length - 2].x, y: u.y - tr.p[tr.p.length - 2].y} : {x: 0, y: 0};
+      const pr = {x: u.x + v.x, y: u.y + v.y}; let best = -1, bd = 14*LW2/320 + Math.hypot(v.x, v.y);
+      comps.forEach((c, j) => { if (usadas.has(j)) return; const dd = Math.hypot(c.x - pr.x, c.y - pr.y); if (dd < bd){ bd = dd; best = j; } });
+      if (best >= 0){ usadas.add(best); tr.p.push(comps[best]); tr.falha = 0; } else tr.falha++;
+    });
+    comps.forEach((c, j) => { if (!usadas.has(j)) tracks.push({p: [c], falha: 0}); });
+    fechadas.push(...tracks.filter(tr => tr.falha > 3)); tracks = tracks.filter(tr => tr.falha <= 3);
+    if (i % 30 === 0){ $("estado").textContent = `Recherche de la balle… ${Math.round(100*i/QUAD.length)} %`; await new Promise(r => setTimeout(r)); }
+  }
+  fechadas.push(...tracks);
+  // a trajetoria de um lancamento: sobe pelo menos 8 px (a 320), topo no meio, parabola a travar, tamanho estavel
+  let melhorT = null, melhorS = 0;
+  fechadas.forEach(tr => {
+    const P = tr.p; if (P.length < 6) return;
+    let it = 0; P.forEach((p, j) => { if (p.y < P[it].y) it = j; });
+    const subida = P[0].y - P[it].y; if (subida < 8*LW2/320 || it < 3) return;
+    const seg = P.slice(0, Math.min(P.length, it + 4)), t0 = seg[0].t; let S = [0,0,0,0,0], R = [0,0,0];
+    seg.forEach(p => { const t = p.t - t0; S[0]++; S[1] += t; S[2] += t*t; S[3] += t**3; S[4] += t**4; R[0] += p.y; R[1] += p.y*t; R[2] += p.y*t*t; });
+    const M = [[S[0],S[1],S[2]],[S[1],S[2],S[3]],[S[2],S[3],S[4]]], det = m => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0]);
+    const D = det(M); if (!D) return; const cf = j => det(M.map((r, ii) => r.map((v, c) => c === j ? R[ii] : v)))/D;
+    const A = cf(0), B = cf(1), C = cf(2); if (C <= 0) return;                         // tem de travar a subir
+    // a travagem tem de ser a da gravidade para o tamanho da bola: C = g/2 em px/s2, com px/cm = diametro/4
+    const ns0 = P.map(p => p.n).sort((a, b) => a - b), diam0 = 2*Math.sqrt(ns0[ns0.length >> 1]/Math.PI), Cexp = 0.5*981*diam0/4*fatorT()*fatorT();
+    const razG = C/Cexp; if (razG < 0.25 || razG > 4) return;
+    let res = 0; seg.forEach(p => { const t = p.t - t0; res += (A + B*t + C*t*t - p.y)**2; }); res = Math.sqrt(res/seg.length);
+    const ns = P.map(p => p.n).sort((a, b) => a - b), med = ns[ns.length >> 1], var_ = ns.filter(n => n > med*3 || n < med/3).length/ns.length;
+    const sc = subida*Math.min(1, P.length/10)/(1 + res)*(1 - var_)/(1 + Math.abs(Math.log(razG)));
+    if (sc > melhorS){ melhorS = sc; melhorT = {P: P.slice(0, Math.min(P.length, it + 4)), it, med}; }
+  });
+  if (!melhorT){ $("estado").textContent = "Aucun lancer trouvé automatiquement : touche la balle quand elle quitte la main (ou « Marquer à la main »)."; return; }
+  // refinar: o seguimento fino (cor + tamanho + movimento) a partir do 1.o ponto encontrado; fica o mais coerente
+  const auto = melhorT.P.map(p => ({x: p.x*k2, y: p.y*k2, t: p.t, r: Math.sqrt(p.n/Math.PI)*k2}));
+  if (!escala){ const diam = 2*Math.sqrt(melhorT.med/Math.PI)*k2*0.8; escala = 4/Math.max(2, diam); }
+  fase = 1; mostra(melhorT.P[0].i);
+  await segue({x: auto[0].x, y: auto[0].y}, true);
+  if (traj.length >= auto.length && topo && soltura && soltura.y - topo.y > 0.5*(auto[0].y - Math.min(...auto.map(p => p.y)))){
+    $("estado").textContent = "Balle trouvée automatiquement (suivi fin). " + $("estado").textContent; return;
+  }
+  // trajetoria na escala de analise e resultado
+  traj = auto;
+  soltura = traj[0]; topo = traj.reduce((a, p) => p.y < a.y ? p : a, traj[0]);
+  fase = 1; await vaiPara(topo.t); mostraResultado();
+  $("estado").textContent = "Balle trouvée automatiquement. " + $("estado").textContent;
+}
+$("autoDet").onclick = () => autoDeteta();
 
 // ---- sessao (guardada no telemovel)
 const CLE = "pingvirtual.services";
