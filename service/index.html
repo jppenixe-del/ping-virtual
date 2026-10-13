@@ -93,17 +93,17 @@ a{color:var(--table)}
       <div class="row" id="calRow">
         <label>Repère :</label>
         <select id="ref">
+          <option value="4">La balle (4 cm) — un seul toque au centre</option>
           <option value="15.25">Hauteur du filet (15,25 cm)</option>
           <option value="152.5">Largeur de la table (152,5 cm)</option>
           <option value="76">Hauteur de la table (76 cm)</option>
-          <option value="4">Diamètre de la balle (4 cm)</option>
           <option value="0">Autre…</option>
         </select>
         <input type="number" id="refOutro" placeholder="cm" style="width:90px" hidden>
       </div>
       <div class="row" style="margin-top:8px" id="fpsRow"><span class="hint">Vitesse réelle de la vidéo :</span><input type="number" id="fpsIn" placeholder="images/s" style="width:110px"><span class="hint">(si connue : permet l'échelle par la gravité)</span></div>
       <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
-      <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
+      <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
 
@@ -222,7 +222,7 @@ function desenha(){
 function marca(p, c){ cx.strokeStyle = c; cx.lineWidth = 3; cx.beginPath(); cx.arc(p.x, p.y, (p.r || 8) + 4, 0, 7); cx.stroke(); }
 function texto(){
   const t = ["", "", ""];
-  if (fase === 0) $("passo").innerHTML = cal.length === 0 ? "2. Calibrage : touche le <b>premier point</b> du repère choisi (une fois par séance si la caméra ne bouge pas)." : "2. Touche le <b>second point</b> du repère.";
+  if (fase === 0) $("passo").innerHTML = $("ref").value === "4" ? "2. Calibrage : va à une image où la balle est <b>nette</b> (dans la main) et touche le <b>centre de la balle</b>. Recommandé pour une vidéo filmée de face." : cal.length === 0 ? "2. Calibrage : touche le <b>premier point</b> du repère choisi, <b>à la même distance que le joueur</b>." : "2. Touche le <b>second point</b> du repère.";
   else if (fase === 1) $("passo").innerHTML = manualFase === 1 ? "Mode manuel : va à l'image où la balle est <b>au plus haut</b> et touche-la." : "3. Avance jusqu'à l'image où la balle <b>quitte la main</b> et touche la balle.";
   else $("passo").innerHTML = "Résultat : la trajectoire est dessinée. Enregistre le service ou recommence.";
   $("calRow").hidden = fase !== 0; $("gravRow").hidden = !(fase === 0 && FPS_REAL); $("fpsRow").hidden = fase !== 0;
@@ -233,9 +233,10 @@ function reinicia(tudo){
   traj = []; soltura = null; topo = null; manualFase = 0; $("resultado").hidden = true; $("estado").textContent = ""; texto(); desenha();
 }
 $("refazer").onclick = () => reinicia(false);
+$("refCal").onclick = () => reinicia(true);
 $("fpsIn").oninput = () => { const f = parseFloat($("fpsIn").value); FPS_REAL = f > 0 ? f : null; if (FPS_REAL) PASSO = 1/FPS_REAL; texto(); };
 $("semRef").onclick = () => { escala = "g"; cal = []; fase = 1; $("estado").textContent = "Échelle calculée par la gravité (vidéo filmée dans l'appli)."; texto(); desenha(); };
-$("ref").onchange = () => { $("refOutro").hidden = $("ref").value !== "0"; };
+$("ref").onchange = () => { $("refOutro").hidden = $("ref").value !== "0"; cal = []; texto(); desenha(); };
 $("tempo").oninput = e => mostra(Math.round(e.target.value/1000*(QUAD.length - 1)));
 $("voltar").onclick = () => mostra(idx - 1);
 $("avancar").onclick = () => mostra(idx + 1);
@@ -244,6 +245,23 @@ $("manual").onclick = () => { if (!escala) { $("estado").textContent = "Fais d'a
 function pos(e){ const r = cv.getBoundingClientRect(); return {x: (e.clientX - r.left)*W/r.width, y: (e.clientY - r.top)*H/r.height}; }
 cv.addEventListener("pointerdown", async e => {
   const p = pos(e);
+  if (fase === 0 && $("ref").value === "4"){
+    const img = cx.getImageData(0, 0, W, H).data, cor = amostraCor(img, p.x, p.y);
+    // pixeis da cor da bola ligados ao ponto tocado (enchimento), num raio de 60 px
+    const vis = new Uint8Array(W*H), fila = [[Math.round(p.x), Math.round(p.y)]]; let n = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1;
+    while (fila.length && n < 20000){
+      const [x, y] = fila.pop(); if (x < 0 || y < 0 || x >= W || y >= H || Math.hypot(x - p.x, y - p.y) > 60) continue;
+      const k = y*W + x; if (vis[k]) continue; vis[k] = 1;
+      const i = k*4; if (Math.abs(img[i]-cor[0]) + Math.abs(img[i+1]-cor[1]) + Math.abs(img[i+2]-cor[2]) > 70) continue;
+      n++; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      fila.push([x+1, y], [x-1, y], [x, y+1], [x, y-1]);
+    }
+    const diam = Math.max(2*Math.sqrt(n/Math.PI), Math.min(x1 - x0 + 1, y1 - y0 + 1));
+    if (n < 12 || diam > 110){ $("estado").textContent = "Balle non reconnue : touche bien le centre d'une balle nette (ou choisis un autre repère)."; return; }
+    cal = [{x: p.x - diam/2, y: p.y}, {x: p.x + diam/2, y: p.y}];
+    escala = 4/diam; fase = 1; $("estado").textContent = `Balle mesurée : ${fmt(diam)} px de diamètre → 1 cm = ${fmt(1/escala)} px.`;
+    texto(); desenha(); return;
+  }
   if (fase === 0){
     cal.push(p); desenha();
     if (cal.length === 2){
