@@ -48,7 +48,9 @@ a{color:var(--table)}
 
   <div class="card" style="border:2px solid var(--ball)">
     <div class="etapa">⚡ Mode direct : la caméra suit chaque lancer, feu <b style="color:var(--win)">vert</b> ou <b style="color:var(--loss)">rouge</b>, et enregistre la séance avec l'analyse à l'écran.</div>
-    <div class="row"><button class="btn" id="dirAbre">Démarrer le mode direct</button></div>
+    <div class="row"><button class="btn" id="dirAbre">Démarrer le mode direct</button>
+      <select id="resol" aria-label="Résolution"><option value="1280x720">720p</option><option value="1920x1080" selected>1080p</option><option value="3840x2160">4K</option></select></div>
+    <p class="hint">Le navigateur limite la caméra (souvent 60 images/s). Pour le ralenti 240 images/s, filme avec l'appareil photo du téléphone en mode Ralenti et choisis la vidéo plus bas.</p>
   </div>
   <div id="dir" hidden style="position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column">
     <div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
@@ -136,7 +138,10 @@ $("arq").onchange = e => { const f = e.target.files[0]; if (!f) return; FPS_REAL
 let FPS_REAL = null;
 // Todas as imagens do video ficam em memoria (extraidas uma vez, a tocar o video devagar): assim anda-se para a frente
 // e para tras sem depender do "seek" do navegador (que em muitos videos de telemovel so' funciona para a frente).
-let QUAD = [], idx = 0;
+let QUAD = [], idx = 0, FPS_ARQ = null;
+// camara lenta: o ficheiro guarda o tempo esticado (ex.: 240 i/s filmadas, gravadas a 30 i/s). Com a velocidade real
+// indicada, os tempos sao corrigidos por FPS_ARQ/FPS_REAL antes da escala pela gravidade.
+const fatorT = () => (FPS_REAL && FPS_ARQ && Math.abs(FPS_REAL/FPS_ARQ - 1) > 0.15) ? FPS_ARQ/FPS_REAL : 1;
 const MAXQ = 900;
 function abreVideo(f){
   QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
@@ -149,6 +154,7 @@ function abreVideo(f){
     const fpsArq = dts.length ? 1/dts[Math.floor(dts.length/2)] : null;
     $("trab").hidden = false;
     $("info").textContent = `${v.videoWidth}×${v.videoHeight} · ${QUAD.length} images${fpsArq ? ` · ${Math.round(fpsArq)} images/s` : ""}${QUAD.length >= MAXQ ? " · (vidéo longue : seules les premières secondes)" : ""}`;
+    FPS_ARQ = fpsArq || null;
     if (!FPS_REAL && fpsArq) $("fpsIn").placeholder = `${Math.round(fpsArq)} ?`;
     mostra(0); reinicia(true);
   };
@@ -182,14 +188,9 @@ let stream = null, rec = null, pedacos = [];
 $("abreCam").onclick = async () => {
   $("camZona").hidden = false; $("camInfo").textContent = "Ouverture de la caméra…";
   try {
-    stream = await navigator.mediaDevices.getUserMedia({audio: false, video: {facingMode: {ideal: "environment"}, width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: 240}}});
-    const tr = stream.getVideoTracks()[0], cap = tr.getCapabilities ? tr.getCapabilities() : {};
-    if (cap.frameRate && cap.frameRate.max){
-      try { await tr.applyConstraints({width: {ideal: 1280}, height: {ideal: 720}, frameRate: {ideal: cap.frameRate.max}}); } catch(e){}
-    }
-    $("prev").srcObject = stream;
-    const st = tr.getSettings(); FPS_REAL = st.frameRate || 30;
-    $("camInfo").textContent = `${st.width}×${st.height} · ${Math.round(FPS_REAL)} images/s${cap.frameRate && cap.frameRate.max ? ` (max. ${Math.round(cap.frameRate.max)})` : ""}`;
+    stream = await pedeCamera();
+    $("prev").srcObject = stream; FPS_REAL = stream._fps;
+    $("camInfo").textContent = stream._info;
     $("grava").disabled = false;
   } catch(e){ $("camInfo").textContent = "Caméra indisponible (autorise l'accès à la caméra) : " + e.name; }
 };
@@ -366,7 +367,8 @@ function analisa(){
   // ponto de lancamento: onde a velocidade de subida e' maxima (antes disso a mao ainda acelera a bola)
   let iRel = 0;
   // imagens repetidas (o navegador devolve por vezes a mesma imagem duas vezes ao avancar) saem da analise
-  const tp = traj.filter((p, i) => p.t != null && !(i && Math.abs(p.x - traj[i-1].x) < 0.01 && Math.abs(p.y - traj[i-1].y) < 0.01));
+  const ft = fatorT();
+  const tp = traj.filter((p, i) => p.t != null && !(i && Math.abs(p.x - traj[i-1].x) < 0.01 && Math.abs(p.y - traj[i-1].y) < 0.01)).map(p => ({...p, t: p.t*ft}));
   if (tp.length >= 6){
     let vmax = 0;
     // velocidade de subida em janelas de 2 intervalos; o lancamento e' o fim da janela mais rapida (fim do impulso da mao)
@@ -431,19 +433,28 @@ $("tol").oninput = () => { if (fase === 2) mostraResultado(); };
 const D = {on:false, st:null, vid:null, cv:null, cx:null, low:null, lx:null, prev:null, cor:[255,122,26], escolheCor:false,
            pts:[], ult:null, rec:null, partes:[], t0rec:null, servs:[], fpsFonte:30};
 const LW = 240;   // largura da analise
+function pedeCamera(){
+  const [w, h] = ($("resol").value || "1920x1080").split("x").map(Number);
+  return navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:"environment"}, width:{ideal:w}, height:{ideal:h}, frameRate:{ideal:240}}}).then(async st => {
+    const tr = st.getVideoTracks()[0], cap = tr.getCapabilities ? tr.getCapabilities() : {};
+    if (cap.frameRate && cap.frameRate.max){ try { await tr.applyConstraints({width:{ideal:w}, height:{ideal:h}, frameRate:{ideal:cap.frameRate.max}}); } catch(e){} }
+    const se = tr.getSettings();
+    st._info = `${se.width}×${se.height} · ${Math.round(se.frameRate || 30)} images/s` + (cap.width ? ` (max. du navigateur : ${cap.width.max}×${cap.height.max}, ${Math.round(cap.frameRate ? cap.frameRate.max : 30)} i/s)` : "");
+    st._fps = se.frameRate || 30; return st;
+  });
+}
 $("dirAbre").onclick = async () => {
   try {
-    D.st = await navigator.mediaDevices.getUserMedia({audio:false, video:{facingMode:{ideal:"environment"}, width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:240}}});
+    D.st = await pedeCamera();
   } catch(e){ alert("Caméra indisponible : " + e.name); return; }
-  const tr = D.st.getVideoTracks()[0], cap = tr.getCapabilities ? tr.getCapabilities() : {};
-  if (cap.frameRate && cap.frameRate.max){ try { await tr.applyConstraints({width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:cap.frameRate.max}}); } catch(e){} }
+  const tr = D.st.getVideoTracks()[0];
   D.vid = document.createElement("video"); D.vid.muted = true; D.vid.playsInline = true; D.vid.srcObject = D.st; await D.vid.play();
   const sset = tr.getSettings(); D.fpsFonte = sset.frameRate || 30;
   D.cv = $("dirCv"); D.cv.width = D.vid.videoWidth; D.cv.height = D.vid.videoHeight; D.cx = D.cv.getContext("2d");
   D.low = document.createElement("canvas"); D.low.width = LW; D.low.height = Math.round(LW*D.vid.videoHeight/D.vid.videoWidth);
   D.lx = D.low.getContext("2d", {willReadFrequently:true});
   D.on = true; D.servs = []; D.pts = []; D.ult = null; $("dir").hidden = false; $("dirCont").textContent = "0 service";
-  $("dirMsg").textContent = `${D.vid.videoWidth}×${D.vid.videoHeight} · ${Math.round(D.fpsFonte)} images/s — filme de côté, puis lance la balle. Touche « 🎯 » puis la balle si elle n'est pas orange.`;
+  $("dirMsg").textContent = `${D.st._info} — filme de côté, puis lance la balle. Touche « 🎯 » puis la balle si elle n'est pas orange.`;
   try { await navigator.wakeLock.request("screen"); } catch(e){}
   D.vid.requestVideoFrameCallback(quadro);
 };
