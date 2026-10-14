@@ -226,10 +226,10 @@ function abreVideo(f){
   v.onloadedmetadata = async () => {
     const lw = Math.min(640, v.videoWidth); W = lw; H = Math.round(v.videoHeight*lw/v.videoWidth);
     cv.width = W; cv.height = H;
-    if (isFinite(v.duration) && v.duration > 3){
+    if (isFinite(v.duration) && v.duration > 0){
       // video comprido: ve-se ja' (navegacao direta no video); so' o trecho marcado e' preparado depois
       PREVIA = true; INTERV = null; $("trab").hidden = false; reinicia(true);
-      $("info").textContent = `${v.videoWidth}×${v.videoHeight} · ${fmt(v.duration, 1)} s — marque ⏮ le début et ⏭ la fin du service`;
+      $("info").textContent = `${v.videoWidth}×${v.videoHeight} · ${fmt(v.duration, 1)} s — marque ⏮ le début et ⏭ la fin du service` + (v.duration <= 3 ? " (ou 🔎 directement : vidéo courte)" : "");
       await seekPrev(0); if (typeof mostraInterv === "function") mostraInterv(); return;
     }
     PREVIA = false;
@@ -291,7 +291,7 @@ function extraiTrecho(a, b){
 }
 async function preparaTrecho(){
   if (!PREVIA) return;
-  const a = INTERV ? INTERV.a : 0, b = INTERV && isFinite(INTERV.b) ? INTERV.b : Math.min(v.duration, a + 4);
+  const a = INTERV ? INTERV.a : 0, b = INTERV && isFinite(INTERV.b) ? INTERV.b : (INTERV ? Math.min(v.duration, a + 4) : v.duration);
   $("estado").textContent = "Préparation de l'intervalle…";
   await extraiTrecho(a, b);
   PREVIA = false;
@@ -305,7 +305,7 @@ async function preparaTrecho(){
 // nova versao da app Android? (a pagina vem sempre do site; o APK so' muda quando ha' novidades na camara)
 // versao visivel (app e pagina), para saber o que esta' instalado
 (function(){ const h = document.querySelector("h1, .titulo, header"); const e = document.createElement("div"); e.className = "hint"; e.id = "versoes";
-  e.textContent = (window.Android && window.Android.versao ? "Appli " + window.Android.versao() + " · " : "") + "page " + (document.querySelector('meta[name="pv-versao"]')?.content || "pv-42");
+  e.textContent = (window.Android && window.Android.versao ? "Appli " + window.Android.versao() + " · " : "") + "page " + (document.querySelector('meta[name="pv-versao"]')?.content || "pv-43");
   (h && h.parentNode ? h.parentNode.insertBefore(e, h.nextSibling) : document.body.prepend(e)); })();
 if (window.Android && window.Android.versao){
   fetch("../app/versao.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.json()).then(j => {
@@ -1132,7 +1132,7 @@ function mostraInterv(){
 $("intIni").onclick = () => { const t = agoraT(); INTERV = {a: t, b: INTERV && INTERV.b > t ? INTERV.b : Infinity}; mostraInterv(); };
 $("intFim").onclick = () => { const t = agoraT(); INTERV = {a: INTERV && INTERV.a < t ? INTERV.a : 0, b: t}; mostraInterv(); };
 $("intLimpa").onclick = async () => { const t = agoraT(); INTERV = null;
-  if (isFinite(v.duration) && v.duration > 3){ PREVIA = true; reinicia(false); $("intTxt").textContent = "Choisis un autre service : ⏮ début, ⏭ fin."; await seekPrev(t); }
+  if (isFinite(v.duration) && v.duration > 0){ PREVIA = true; reinicia(false); $("intTxt").textContent = "Choisis un autre service : ⏮ début, ⏭ fin."; await seekPrev(t); }
   else $("intTxt").textContent = "Intervalle effacé : toute la vidéo est analysée.";
   mostraInterv(); };
 $("coupToque").onclick = () => { MODO_COUP = true; $("coupEstado").textContent = "Va à l'image juste après le coup de raquette et touche la balle."; };
