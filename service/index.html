@@ -160,7 +160,17 @@ let QUAD = [], idx = 0, FPS_ARQ = null;
 // indicada, os tempos sao corrigidos por FPS_ARQ/FPS_REAL antes da escala pela gravidade.
 const fatorT = () => (FPS_REAL && FPS_ARQ && Math.abs(FPS_REAL/FPS_ARQ - 1) > 0.15) ? FPS_ARQ/FPS_REAL : 1;
 const MAXQ = 900;
-const API_IA = "https://5-189-185-48.sslip.io/api/ia";
+// dois enderecos do mesmo servidor: algumas redes/DNS bloqueiam um deles
+const APIS_IA = ["https://5-189-185-48.sslip.io/api/ia", "https://5.189.185.48.nip.io/api/ia"];
+let API_IA = APIS_IA[0];
+async function pingIA(){
+  const erros = [];
+  for (const a of [API_IA, ...APIS_IA.filter(x => x !== API_IA)]){
+    try { const r = await fetch(a + "/ping", {signal: AbortSignal.timeout(6000)}); if (r.ok){ API_IA = a; return await r.json(); } erros.push(r.status); }
+    catch(e){ erros.push(e.name === "TimeoutError" ? "délai" : (e.message || e.name)); }
+  }
+  pingIA.erro = erros.join(" / "); return null;
+}
 let PC_PROM = null;
 async function garantePC(){
   if (!ARQV || !$("usaPC").checked) return;
@@ -175,7 +185,7 @@ async function enviaPC(f){
   if (f.size > 190*2**20){ PC_ERRO = `vidéo trop lourde (${Math.round(f.size/2**20)} Mo, max 190)`; return null; }
   let etapa = "contact du PC";
   try {
-    const p = await fetch(API_IA + "/ping", {signal: AbortSignal.timeout(8000)}); if (!p.ok){ PC_ERRO = "PC éteint (réponse " + p.status + ")"; return null; }
+    const p = await pingIA(); if (!p){ PC_ERRO = "serveur injoignable depuis ce téléphone (" + pingIA.erro + ")"; return null; }
     etapa = `envoi de la vidéo (${Math.round(f.size/2**20)} Mo)`;
     const r = await fetch(API_IA + "/envia", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(300000)});
     if (!r.ok){ let m = ""; try { m = (await r.json()).erreur || ""; } catch(_){} PC_ERRO = `le PC a refusé (${r.status}) ${m}`; return null; }
@@ -959,7 +969,7 @@ async function autoDeteta(){
 // estado do PC (ligado/desligado) e preferencia guardada
 (function(){
   try { if (localStorage.getItem("pvUsaPC") === "0") $("usaPC").checked = false; } catch(e){}
-  const ve = () => fetch(API_IA + "/ping", {signal: AbortSignal.timeout(5000)}).then(r => r.ok ? r.json() : null).catch(() => null)
+  const ve = () => pingIA()
     .then(j => { $("pcEstado").textContent = j && j.ok ? "· 🟢 PC connecté" : "· ⚪ PC éteint (analyse sur le téléphone)"; });
   ve(); setInterval(() => { if (!document.hidden) ve(); }, 20000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) ve(); });
