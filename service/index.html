@@ -142,7 +142,7 @@ a{color:var(--table)}
   <p class="hint" style="margin-top:14px">Conseils : caméra à hauteur de la main, perpendiculaire au lancer, fond uni et balle orange si possible. L'arbitrage vidéo (TTR) accepte jusqu'à 30° par rapport à la verticale : c'est la tolérance par défaut, réglable ci-dessus.</p>
 </div>
 
-<script src="ia/bolaia.js?v=39"></script>
+<script src="ia/bolaia.js?v=41"></script>
 <script>
 (function(){
 const $ = id => document.getElementById(id);
@@ -226,6 +226,13 @@ function abreVideo(f){
   v.onloadedmetadata = async () => {
     const lw = Math.min(640, v.videoWidth); W = lw; H = Math.round(v.videoHeight*lw/v.videoWidth);
     cv.width = W; cv.height = H;
+    if (isFinite(v.duration) && v.duration > 3){
+      // video comprido: ve-se ja' (navegacao direta no video); so' o trecho marcado e' preparado depois
+      PREVIA = true; INTERV = null; $("trab").hidden = false; reinicia(true);
+      $("info").textContent = `${v.videoWidth}×${v.videoHeight} · ${fmt(v.duration, 1)} s — marque ⏮ le début et ⏭ la fin du service`;
+      await seekPrev(0); if (typeof mostraInterv === "function") mostraInterv(); return;
+    }
+    PREVIA = false;
     await extrai();
     const dts = QUAD.slice(1).map((q, i) => q.t - QUAD[i].t).filter(d => d > 0).sort((a, b) => a - b);
     const fpsArq = dts.length ? 1/dts[Math.floor(dts.length/2)] : null;
@@ -259,7 +266,41 @@ function extrai(){
     try { v.currentTime = 0; await v.play(); } catch(e){ fim(); }
   });
 }
-function mostra(i){ idx = Math.max(0, Math.min(QUAD.length - 1, i)); desenha(); }
+function mostra(i){ if (PREVIA) return; idx = Math.max(0, Math.min(QUAD.length - 1, i)); desenha(); }
+let PREVIA = false;
+function seekPrev(t){
+  return new Promise(r => { const d = isFinite(v.duration) ? v.duration : 0; t = Math.max(0, Math.min(d - 0.001, t));
+    const ok = () => { desenha(); r(); }; v.addEventListener("seeked", ok, {once: true}); v.currentTime = t; setTimeout(ok, 1500); });
+}
+// prepara so' as imagens do trecho marcado (a 1/4 da velocidade: nenhuma imagem se perde)
+function extraiTrecho(a, b){
+  return new Promise(async res => {
+    QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
+    const fim = () => { v.pause(); v.onended = null; res(); };
+    await seekPrev(Math.max(0, a - 0.05));
+    v.muted = true; v.playbackRate = 0.25;
+    const cada = async (agora, meta) => {
+      if (meta.mediaTime >= a - 0.05) QUAD.push({t: meta.mediaTime, bmp: await createImageBitmap(v, {resizeWidth: W, resizeHeight: H})});
+      if (QUAD.length % 15 === 0) $("estado").textContent = `Préparation de l'intervalle… ${QUAD.length} images`;
+      if (meta.mediaTime > b + 0.05 || QUAD.length >= MAXQ || v.ended) return fim();
+      v.requestVideoFrameCallback(cada);
+    };
+    v.onended = fim; v.requestVideoFrameCallback(cada);
+    try { await v.play(); } catch(e){ fim(); }
+  });
+}
+async function preparaTrecho(){
+  if (!PREVIA) return;
+  const a = INTERV ? INTERV.a : 0, b = INTERV && isFinite(INTERV.b) ? INTERV.b : Math.min(v.duration, a + 4);
+  $("estado").textContent = "Préparation de l'intervalle…";
+  await extraiTrecho(a, b);
+  PREVIA = false;
+  const dts = QUAD.slice(1).map((q, i) => q.t - QUAD[i].t).filter(d => d > 0).sort((x, y) => x - y);
+  FPS_ARQ = dts.length ? 1/dts[dts.length >> 1] : null;
+  if (!FPS_REAL && FPS_ARQ) $("fpsIn").placeholder = `${Math.round(FPS_ARQ)} ?`;
+  $("info").textContent = `${v.videoWidth}×${v.videoHeight} · intervalle ${fmt(a, 2)}–${fmt(b, 2)} s · ${QUAD.length} images${FPS_ARQ ? ` · ${Math.round(FPS_ARQ)} images/s` : ""} (✕ pour choisir un autre service)`;
+  mostra(0);
+}
 // ---- dentro da app Android: camara nativa de alta velocidade (o video volta com a velocidade real)
 // nova versao da app Android? (a pagina vem sempre do site; o APK so' muda quando ha' novidades na camara)
 if (window.Android && window.Android.versao){
@@ -308,11 +349,18 @@ $("grava").onclick = () => {
   rec.start(200); $("grava").textContent = "⏹ Arrêter";
 };
 function vaiPara(t){       // a imagem mais proxima do tempo t
+  if (PREVIA) return seekPrev(t);
   let m = 0; QUAD.forEach((q, i) => { if (Math.abs(q.t - t) < Math.abs(QUAD[m].t - t)) m = i; }); mostra(m); return Promise.resolve();
 }
-const agoraT = () => QUAD[idx] ? QUAD[idx].t : 0;
+const agoraT = () => PREVIA ? v.currentTime : (QUAD[idx] ? QUAD[idx].t : 0);
 window.__pvVai = t => vaiPara(t);   // para os testes automaticos: ir para um tempo exato
 function desenha(){
+  if (PREVIA){
+    cx.drawImage(v, 0, 0, W, H); const d = isFinite(v.duration) ? v.duration : 1;
+    $("tempo").value = Math.round(1000*v.currentTime/d); $("tTxt").textContent = `${fmt(v.currentTime, 2)} s / ${fmt(d, 1)} s`;
+    if (INTERV){ cx.fillStyle = "rgba(255,122,26,.9)"; cx.font = "bold 16px sans-serif"; cx.fillText(`⏮ ${fmt(INTERV.a, 2)} s  ⏭ ${isFinite(INTERV.b) ? fmt(INTERV.b, 2) + " s" : "…"}`, 10, 24); }
+    return;
+  }
   if (QUAD[idx]) cx.drawImage(QUAD[idx].bmp, 0, 0, W, H);
   $("tempo").value = QUAD.length > 1 ? Math.round(1000*idx/(QUAD.length - 1)) : 0; $("tTxt").textContent = `${fmt(agoraT(), 2)} s · image ${idx + 1}/${QUAD.length}`;
   // repere de calibracao
@@ -341,14 +389,15 @@ $("refCal").onclick = () => reinicia(true);
 $("fpsIn").oninput = () => { const f = parseFloat($("fpsIn").value); FPS_REAL = f > 0 ? f : null; if (FPS_REAL) PASSO = 1/FPS_REAL; texto(); };
 $("semRef").onclick = () => { escala = "g"; cal = []; fase = 1; $("estado").textContent = "Échelle calculée par la gravité (vidéo filmée dans l'appli)."; texto(); desenha(); };
 $("ref").onchange = () => { $("refOutro").hidden = $("ref").value !== "0"; cal = []; texto(); desenha(); };
-$("tempo").oninput = e => mostra(Math.round(e.target.value/1000*(QUAD.length - 1)));
-$("voltar").onclick = () => mostra(idx - 1);
-$("avancar").onclick = () => mostra(idx + 1);
+$("tempo").oninput = e => PREVIA ? seekPrev(e.target.value/1000*(isFinite(v.duration) ? v.duration : 0)) : mostra(Math.round(e.target.value/1000*(QUAD.length - 1)));
+$("voltar").onclick = () => PREVIA ? seekPrev(v.currentTime - 1/30) : mostra(idx - 1);
+$("avancar").onclick = () => PREVIA ? seekPrev(v.currentTime + 1/30) : mostra(idx + 1);
 $("manual").onclick = () => { if (!escala) { $("estado").textContent = "Fais d'abord le calibrage."; return; } fase = 1; manualFase = 0; traj = []; soltura = null; topo = null; $("estado").textContent = "Mode manuel : touche la balle quand elle quitte la main, puis au point le plus haut."; manualFase = -1; texto(); desenha(); };
 
 function pos(e){ const r = cv.getBoundingClientRect(); return {x: (e.clientX - r.left)*W/r.width, y: (e.clientY - r.top)*H/r.height}; }
 cv.addEventListener("pointerdown", async e => {
   const p = pos(e);
+  if (PREVIA){ if (!INTERV){ $("estado").textContent = "Marque d'abord ⏮ le début et ⏭ la fin du service."; return; } await preparaTrecho(); return; }
   if (MODO_COUP){ MODO_COUP = false; return medeCoup({x: p.x, y: p.y, t: agoraT()}); }
   if (fase === 0 && $("ref").value === "4"){
     const img = cx.getImageData(0, 0, W, H).data, cor = amostraCor(img, p.x, p.y);
@@ -1046,8 +1095,9 @@ async function autoDeteta(){
   $("usaPC").onchange = () => { try { localStorage.setItem("pvUsaPC", $("usaPC").checked ? "1" : "0"); } catch(e){}
     PC_PROM = $("usaPC").checked && ARQV ? enviaPC(ARQV) : null; if ($("usaPC").checked) ve(); };
 })();
-const precisaIntervalo = () => !INTERV && QUAD.length && QUAD[QUAD.length - 1].t > 3;
+const precisaIntervalo = () => !INTERV && (PREVIA ? v.duration > 3 : QUAD.length && QUAD[QUAD.length - 1].t > 3);
 $("autoDet").onclick = async () => {
+  if (PREVIA){ $("autoDet").disabled = true; try { await preparaTrecho(); } finally { $("autoDet").disabled = false; } }
   if (!QUAD.length){ $("estado").textContent = "Cette vidéo ne se lit pas sur cet appareil (format HEVC/H.265 ?). Filme en H.264 (« Le plus compatible » dans les réglages de l'appareil photo) ou utilise « 📱 Caméra rapide »."; return; }
   if (precisaIntervalo()){ $("estado").textContent = "D'abord : va au début du service et appuie sur « ⏮ Début du service ici », puis à la fin (après la frappe) sur « ⏭ Fin ici »."; return; }
   $("autoDet").disabled = true;
@@ -1077,9 +1127,12 @@ function mostraInterv(){
 }
 $("intIni").onclick = () => { const t = agoraT(); INTERV = {a: t, b: INTERV && INTERV.b > t ? INTERV.b : Infinity}; mostraInterv(); };
 $("intFim").onclick = () => { const t = agoraT(); INTERV = {a: INTERV && INTERV.a < t ? INTERV.a : 0, b: t}; mostraInterv(); };
-$("intLimpa").onclick = () => { INTERV = null; $("intTxt").textContent = "Intervalle effacé : toute la vidéo est analysée."; mostraInterv(); };
+$("intLimpa").onclick = async () => { const t = agoraT(); INTERV = null;
+  if (isFinite(v.duration) && v.duration > 3){ PREVIA = true; reinicia(false); $("intTxt").textContent = "Choisis un autre service : ⏮ début, ⏭ fin."; await seekPrev(t); }
+  else $("intTxt").textContent = "Intervalle effacé : toute la vidéo est analysée.";
+  mostraInterv(); };
 $("coupToque").onclick = () => { MODO_COUP = true; $("coupEstado").textContent = "Va à l'image juste après le coup de raquette et touche la balle."; };
-$("coupBtn").onclick = () => { if (precisaIntervalo()){ $("coupEstado").textContent = "D'abord : marque le début et la fin du coup (⏮ / ⏭ plus haut)."; return; } medeCoup(null); };
+$("coupBtn").onclick = async () => { if (precisaIntervalo()){ $("coupEstado").textContent = "D'abord : marque le début et la fin du coup (⏮ / ⏭ plus haut)."; return; } await preparaTrecho(); medeCoup(null); };
 async function medeCoup(semente){
   await garantePC();
   const est = t => $("coupEstado").textContent = t;
