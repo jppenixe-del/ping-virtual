@@ -111,6 +111,7 @@ a{color:var(--table)}
       <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (IA)</button>
         <select id="tipoBola" aria-label="Balle"><option value="branca">Balle blanche</option><option value="laranja">Balle orange</option></select></div>
       <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="usaPC" checked> Analyse sur le PC (carte RTX), plus rapide et plus précise <span id="pcEstado"></span></label>
+      <div class="row" style="margin-top:4px;align-items:center"><input type="password" id="chaveIA" placeholder="Code d'accès du PC" autocomplete="off" style="width:170px;text-transform:uppercase"><button class="btn ghost" id="chaveOk">OK</button></div>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
@@ -163,10 +164,13 @@ const MAXQ = 900;
 // dois enderecos do mesmo servidor: algumas redes/DNS bloqueiam um deles
 const APIS_IA = ["https://5-189-185-48.sslip.io/api/ia", "https://5.189.185.48.nip.io/api/ia"];
 let API_IA = APIS_IA[0];
+// codigo de acesso ao PC (guardado so' neste telemovel; o servidor recusa tudo sem ele)
+const chaveIA = () => { try { return localStorage.getItem("pvChaveIA") || ""; } catch(e){ return ""; } };
+const hdrIA = (extra) => ({...(extra || {}), "X-Chave": chaveIA()});
 async function pingIA(){
   const erros = [];
   for (const a of [API_IA, ...APIS_IA.filter(x => x !== API_IA)]){
-    try { const r = await fetch(a + "/ping", {signal: AbortSignal.timeout(6000)}); if (r.ok){ API_IA = a; return await r.json(); } erros.push(r.status); }
+    try { const r = await fetch(a + "/ping", {headers: hdrIA(), signal: AbortSignal.timeout(6000)}); if (r.ok){ API_IA = a; return await r.json(); } erros.push(r.status); }
     catch(e){ erros.push(e.name === "TimeoutError" ? "délai" : (e.message || e.name)); }
   }
   pingIA.erro = erros.join(" / "); return null;
@@ -186,8 +190,10 @@ async function enviaPC(f){
   let etapa = "contact du PC";
   try {
     const p = await pingIA(); if (!p){ PC_ERRO = "serveur injoignable depuis ce téléphone (" + pingIA.erro + ")"; return null; }
+    if (!p.ok){ PC_ERRO = "PC éteint"; return null; }
+    if (!p.code){ PC_ERRO = "code d'accès manquant ou faux (champ « Code d'accès du PC »)"; return null; }
     etapa = `envoi de la vidéo (${Math.round(f.size/2**20)} Mo)`;
-    const r = await fetch(API_IA + "/envia", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(300000)});
+    const r = await fetch(API_IA + "/envia", {method: "POST", body: f, headers: hdrIA({"Content-Type": "application/octet-stream"}), signal: AbortSignal.timeout(300000)});
     if (!r.ok){ let m = ""; try { m = (await r.json()).erreur || ""; } catch(_){} PC_ERRO = `le PC a refusé (${r.status}) ${m}`; return null; }
     const j = await r.json(); if (!j.id || !j.n){ PC_ERRO = "le PC n'a pas pu lire la vidéo (format ?)"; return null; }
     return {id: j.id, fps: j.fps, n: j.n, cache: {}};
@@ -200,7 +206,7 @@ async function rmPC(){
   if (info.cache[chave]) return info.cache[chave];
   let q = `id=${info.id}`; if (INTERV){ q += `&a=${INTERV.a}`; if (isFinite(INTERV.b)) q += `&b=${INTERV.b}`; }
   try {
-    const r = await fetch(API_IA + "/analisa_id?" + q, {signal: AbortSignal.timeout(240000)});
+    const r = await fetch(API_IA + "/analisa_id?" + q, {headers: hdrIA(), signal: AbortSignal.timeout(240000)});
     if (!r.ok){ PC_ERRO = "analyse refusée (" + r.status + ")"; return null; }
     const j = await r.json(); if (!(j.imagens && j.imagens.length)) return null;
     j.imagens.id = info.id; info.cache[chave] = j.imagens; return j.imagens;
@@ -1001,7 +1007,10 @@ async function autoDeteta(){
 (function(){
   try { if (localStorage.getItem("pvUsaPC") === "0") $("usaPC").checked = false; } catch(e){}
   const ve = () => pingIA()
-    .then(j => { $("pcEstado").textContent = j && j.ok ? "· 🟢 PC connecté" : "· ⚪ PC éteint (analyse sur le téléphone)"; });
+    .then(j => { $("pcEstado").textContent = !(j && j.ok) ? "· ⚪ PC éteint (analyse sur le téléphone)" : j.code ? "· 🟢 PC connecté" : "· 🟠 PC allumé — entre le code d'accès"; });
+  $("chaveIA").value = chaveIA();
+  $("chaveOk").onclick = () => { try { localStorage.setItem("pvChaveIA", $("chaveIA").value.trim().toUpperCase()); } catch(e){}
+    ve(); if (ARQV && $("usaPC").checked) PC_PROM = enviaPC(ARQV); };
   ve(); setInterval(() => { if (!document.hidden) ve(); }, 20000);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) ve(); });
   $("usaPC").onchange = () => { try { localStorage.setItem("pvUsaPC", $("usaPC").checked ? "1" : "0"); } catch(e){}
@@ -1109,7 +1118,7 @@ async function medeCoup(semente){
   if (!RM || !RM.id){ $("tRot").textContent = "PC éteint : effet non mesuré"; return; }
   $("tRot").textContent = "mesure sur le PC…";
   try {
-    const r = await fetch(API_IA + "/rotacao", {method: "POST", headers: {"Content-Type": "application/json"}, signal: AbortSignal.timeout(60000),
+    const r = await fetch(API_IA + "/rotacao", {method: "POST", headers: hdrIA({"Content-Type": "application/json"}), signal: AbortSignal.timeout(60000),
       body: JSON.stringify({id: RM.id, pontos: P.map(p => ({t: p.t, x: p.x/W, y: p.y/H, r: p.r/W}))})}).then(r => r.json());
     if (!r.ok){ $("tRot").textContent = "ligne sur la balle non visible (balle marquée ? 240 i/s ?)"; return; }
     const rpm = r.rpm/ft, lift = (r.sinal > 0) === (vx > 0);
