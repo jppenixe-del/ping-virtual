@@ -167,13 +167,22 @@ async function garantePC(){
   const r = PC_PROM ? await PC_PROM : null;
   if (!r){ PC_PROM = enviaPC(ARQV); const pe = $("pcVideo"); if (pe) pe.textContent = "🖥️ Vidéo envoyée au PC (carte RTX) pour l'analyse…"; }
 }
+let PC_ERRO = "";
 async function enviaPC(f){
-  if (!f || f.size > 190*2**20 || ($("usaPC") && !$("usaPC").checked)) return null;
+  PC_ERRO = "";
+  if (!f) return null;
+  if ($("usaPC") && !$("usaPC").checked){ PC_ERRO = "analyse PC désactivée"; return null; }
+  if (f.size > 190*2**20){ PC_ERRO = `vidéo trop lourde (${Math.round(f.size/2**20)} Mo, max 190)`; return null; }
+  let etapa = "contact du PC";
   try {
-    const p = await fetch(API_IA + "/ping", {signal: AbortSignal.timeout(5000)}); if (!p.ok) return null;
-    const r = await fetch(API_IA + "/analisa", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(180000)});
-    if (!r.ok) return null; const j = await r.json(); if (!(j.imagens && j.imagens.length)) return null; j.imagens.id = j.id; return j.imagens;
-  } catch(e){ return null; }
+    const p = await fetch(API_IA + "/ping", {signal: AbortSignal.timeout(8000)}); if (!p.ok){ PC_ERRO = "PC éteint (réponse " + p.status + ")"; return null; }
+    etapa = `envoi de la vidéo (${Math.round(f.size/2**20)} Mo)`;
+    const r = await fetch(API_IA + "/analisa", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(300000)});
+    if (!r.ok){ let m = ""; try { m = (await r.json()).erreur || ""; } catch(_){} PC_ERRO = `le PC a refusé (${r.status}) ${m}`; return null; }
+    etapa = "lecture de la réponse";
+    const j = await r.json(); if (!(j.imagens && j.imagens.length)){ PC_ERRO = "le PC n'a pas pu lire la vidéo (format ?)"; return null; }
+    j.imagens.id = j.id; return j.imagens;
+  } catch(e){ PC_ERRO = `échec : ${etapa} — ${e.name === "TimeoutError" ? "trop long" : (e.message || e.name)}`; return null; }
 }
 let ARQV = null;
 function abreVideo(f){
@@ -182,7 +191,7 @@ function abreVideo(f){
   if (pe){
     pe.textContent = PC_PROM && $("usaPC").checked ? "🖥️ Vidéo envoyée au PC (carte RTX) pour l'analyse…" : "";
     const este = PC_PROM; PC_PROM.then(r => { if (PC_PROM !== este) return;
-      pe.textContent = r ? `🖥️ PC : analyse prête (${r.length} images) — appuie sur « 🔎 Détection automatique » ou « ⚡ Vitesse et effet »` : "🖥️ PC éteint ou injoignable : l'analyse se fera sur le téléphone"; });
+      pe.textContent = r ? `🖥️ PC : analyse prête (${r.length} images) — appuie sur « 🔎 Détection automatique » ou « ⚡ Vitesse et effet »` : "🖥️ PC : " + (PC_ERRO || "injoignable") + " — l'analyse se fera sur le téléphone"; });
   }
   QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
   v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";

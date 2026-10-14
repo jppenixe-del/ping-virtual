@@ -145,6 +145,7 @@ class H(BaseHTTPRequestHandler):
         self.responde(200, d)
     def ia_ping(self):
         import urllib.request
+        print(f"ia ping origem={self.headers.get('Origin')}", flush=True)
         try:
             with urllib.request.urlopen(PC_BOLA + "/ping", timeout=3) as r: return self.responde(200, json.load(r))
         except Exception: return self.responde(503, {"ok": False, "erreur": "PC éteint"})
@@ -152,6 +153,7 @@ class H(BaseHTTPRequestHandler):
         """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens (ou a rotacao da bola)"""
         import urllib.request, urllib.error
         n = int(self.headers.get("Content-Length") or 0)
+        print(f"ia {rota} origem={self.headers.get('Origin')} tamanho={n/2**20:.1f}Mo", flush=True)
         if not n or n > 200 * 2**20: return self.responde(413, {"erreur": "vidéo trop grande (max 200 Mo)"})
         corpo = self.rfile.read(n)
         try:
