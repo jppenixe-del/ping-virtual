@@ -160,6 +160,11 @@ const fatorT = () => (FPS_REAL && FPS_ARQ && Math.abs(FPS_REAL/FPS_ARQ - 1) > 0.
 const MAXQ = 900;
 const API_IA = "https://5-189-185-48.sslip.io/api/ia";
 let PC_PROM = null;
+async function garantePC(){
+  if (!ARQV || !$("usaPC").checked) return;
+  const r = PC_PROM ? await PC_PROM : null;
+  if (!r){ PC_PROM = enviaPC(ARQV); const pe = $("pcVideo"); if (pe) pe.textContent = "🖥️ Vidéo envoyée au PC (carte RTX) pour l'analyse…"; }
+}
 async function enviaPC(f){
   if (!f || f.size > 190*2**20 || ($("usaPC") && !$("usaPC").checked)) return null;
   try {
@@ -640,6 +645,7 @@ const ajustaParab = seg => {      // y = A + B t + C t^2 e x = ax + bx t (minimo
   return {t0, A, B, C, ax, bx, res: Math.sqrt(res/seg.length), y: t => A + B*(t - t0) + C*(t - t0)**2, x: t => ax + bx*(t - t0)};
 };
 async function detetaIA(){
+  await garantePC();
   // com o PC ligado, as detecoes vem da RTX (todas as imagens do video, em resolucao total); senao, a IA corre aqui
   let RM = null;
   if (PC_PROM){ $("estado").textContent = "Analyse sur le PC (RTX)…"; RM = await PC_PROM; }
@@ -869,7 +875,8 @@ async function autoDeteta(){
   try { if (localStorage.getItem("pvUsaPC") === "0") $("usaPC").checked = false; } catch(e){}
   const ve = () => fetch(API_IA + "/ping", {signal: AbortSignal.timeout(5000)}).then(r => r.ok ? r.json() : null).catch(() => null)
     .then(j => { $("pcEstado").textContent = j && j.ok ? "· 🟢 PC connecté" : "· ⚪ PC éteint (analyse sur le téléphone)"; });
-  ve();
+  ve(); setInterval(() => { if (!document.hidden) ve(); }, 20000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) ve(); });
   $("usaPC").onchange = () => { try { localStorage.setItem("pvUsaPC", $("usaPC").checked ? "1" : "0"); } catch(e){}
     PC_PROM = $("usaPC").checked && ARQV ? enviaPC(ARQV) : null; if ($("usaPC").checked) ve(); };
 })();
@@ -894,6 +901,7 @@ let MODO_COUP = false;
 $("coupToque").onclick = () => { MODO_COUP = true; $("coupEstado").textContent = "Va à l'image juste après le coup de raquette et touche la balle."; };
 $("coupBtn").onclick = () => medeCoup(null);
 async function medeCoup(semente){
+  await garantePC();
   const est = t => $("coupEstado").textContent = t;
   if (!QUAD.length){ est("Ouvre d'abord une vidéo."); return; }
   let RM = null;
