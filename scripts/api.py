@@ -65,6 +65,7 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
     def do_GET(self):
         if self.path.startswith("/api/ia/ping"): return self.ia_ping()
+        if self.path.startswith("/api/ia/analisa_id"): return self.ia_trecho()
         if self.path.startswith("/api/classement"): return self.classement()
         mf = re.fullmatch(r"/api/joueur/(\d{5,8})/fiche", self.path.split("?")[0])
         if mf: return self.ficha(mf.group(1))
@@ -81,6 +82,7 @@ class H(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.startswith("/api/ia/analisa"): return self.ia_analisa()
         if self.path.startswith("/api/ia/rotacao"): return self.ia_analisa("/rotacao", "application/json")
+        if self.path.startswith("/api/ia/envia"): return self.ia_analisa("/envia")
         mm = re.fullmatch(r"/api/maj/(\d{5,8})", self.path.split("?")[0])
         if mm: return self.maj(mm.group(1))
         m = re.fullmatch(r"/api/joueur/(\d{5,8})", self.path.split("?")[0])
@@ -149,6 +151,19 @@ class H(BaseHTTPRequestHandler):
         try:
             with urllib.request.urlopen(PC_BOLA + "/ping", timeout=3) as r: return self.responde(200, json.load(r))
         except Exception: return self.responde(503, {"ok": False, "erreur": "PC éteint"})
+    def ia_trecho(self):
+        """analise so' do trecho marcado de um video ja' enviado (GET /api/ia/analisa_id?id=&a=&b=)"""
+        import urllib.request, urllib.error
+        from urllib.parse import urlparse
+        q = urlparse(self.path).query
+        print(f"ia trecho {q}", flush=True)
+        try:
+            with urllib.request.urlopen(PC_BOLA + "/analisa_id?" + q, timeout=240) as r: b = r.read()
+        except urllib.error.HTTPError as e: return self.responde(e.code, {"erreur": "PC : " + e.read().decode(errors="replace")[:200]})
+        except Exception: return self.responde(503, {"erreur": "PC injoignable"})
+        self.send_response(200); self.cors()
+        self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b)))
+        self.end_headers(); self.wfile.write(b)
     def ia_analisa(self, rota="/analisa", tipo="application/octet-stream"):
         """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens (ou a rotacao da bola)"""
         import urllib.request, urllib.error
