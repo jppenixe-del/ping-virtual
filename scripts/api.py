@@ -17,6 +17,19 @@ pp.time = type("T", (), {"sleep": staticmethod(lambda s: _dorme(min(s, 0.4)))}) 
 
 ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767", "https://appassets.androidplatform.net"}
 PC_BOLA = "http://10.0.0.2:8791"     # IA da bola na RTX do PC do Joao (pelo tunel WireGuard)
+# protecao da IA: codigo de acesso (fora do repositorio) + limite de pedidos por endereco
+import hmac, collections
+CHAVE_F = "/root/ping-virtual-cache/ia_chave.txt"
+def chave_ia():
+    try: return open(CHAVE_F).read().strip()
+    except OSError: return None
+PEDIDOS = collections.defaultdict(collections.deque)      # ip -> tempos dos pedidos (ultimos 10 min)
+FALHAS = collections.defaultdict(collections.deque)       # ip -> codigos errados (ultima hora)
+def limite(ip, fila, maximo, janela):
+    agora = time.time(); q = fila[ip]
+    while q and agora - q[0] > janela: q.popleft()
+    if len(q) >= maximo: return False
+    q.append(agora); return True
 TRAVA = threading.Lock()
 CACHE = {}
 ADV = {}; EM_CURSO = set()
@@ -54,6 +67,20 @@ class H(BaseHTTPRequestHandler):
     def cors(self):
         o = self.headers.get("Origin", "")
         if o in ORIGENS: self.send_header("Access-Control-Allow-Origin", o); self.send_header("Vary", "Origin")
+    def ip(self):
+        return (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[-1].strip()
+    def ia_autorizado(self):
+        """o codigo de acesso tem de vir no cabecalho X-Chave; muitos codigos errados bloqueiam o endereco por 1 hora"""
+        ip = self.ip()
+        if len(FALHAS[ip]) >= 10 and time.time() - FALHAS[ip][0] < 3600:
+            self.responde(429, {"erreur": "trop d'essais, réessaie plus tard"}); return False
+        if not limite(ip, PEDIDOS, 60, 600):
+            self.responde(429, {"erreur": "trop de demandes, attends quelques minutes"}); return False
+        k = chave_ia(); dado = (self.headers.get("X-Chave") or "").strip().upper()
+        if not k or not hmac.compare_digest(dado.encode(), k.encode()):
+            limite(ip, FALHAS, 10, 3600); print(f"ia codigo errado de {ip}", flush=True)
+            self.responde(401, {"erreur": "code d'accès invalide"}); return False
+        return True
     def responde(self, code, obj):
         b = json.dumps(obj, ensure_ascii=False).encode()
         self.send_response(code); self.cors()
@@ -61,7 +88,7 @@ class H(BaseHTTPRequestHandler):
         self.end_headers(); self.wfile.write(b)
     def do_OPTIONS(self):
         self.send_response(204); self.cors()
-        self.send_header("Access-Control-Allow-Methods", "GET, POST"); self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST"); self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Chave")
         self.end_headers()
     def do_GET(self):
         if self.path.startswith("/api/ia/ping"): return self.ia_ping()
@@ -149,13 +176,20 @@ class H(BaseHTTPRequestHandler):
         import urllib.request
         print(f"ia ping origem={self.headers.get('Origin')}", flush=True)
         try:
-            with urllib.request.urlopen(PC_BOLA + "/ping", timeout=3) as r: return self.responde(200, json.load(r))
+            k = chave_ia(); dado = (self.headers.get("X-Chave") or "").strip().upper()
+            with urllib.request.urlopen(PC_BOLA + "/ping", timeout=3) as r: j = json.load(r)
+            return self.responde(200, {"ok": bool(j.get("ok")), "code": bool(k and dado and hmac.compare_digest(dado.encode(), k.encode()))})
         except Exception: return self.responde(503, {"ok": False, "erreur": "PC éteint"})
     def ia_trecho(self):
         """analise so' do trecho marcado de um video ja' enviado (GET /api/ia/analisa_id?id=&a=&b=)"""
         import urllib.request, urllib.error
         from urllib.parse import urlparse
-        q = urlparse(self.path).query
+        from urllib.parse import parse_qs, urlencode
+        if not self.ia_autorizado(): return
+        p = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+        if not re.fullmatch(r"[0-9a-f]{16}", p.get("id", "")): return self.responde(400, {"erreur": "id invalide"})
+        try: q = urlencode({"id": p["id"], **{k: f"{float(p[k]):.3f}" for k in ("a", "b") if k in p}})
+        except ValueError: return self.responde(400, {"erreur": "intervalle invalide"})
         print(f"ia trecho {q}", flush=True)
         try:
             with urllib.request.urlopen(PC_BOLA + "/analisa_id?" + q, timeout=240) as r: b = r.read()
@@ -167,6 +201,7 @@ class H(BaseHTTPRequestHandler):
     def ia_analisa(self, rota="/analisa", tipo="application/octet-stream"):
         """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens (ou a rotacao da bola)"""
         import urllib.request, urllib.error
+        if not self.ia_autorizado(): return
         n = int(self.headers.get("Content-Length") or 0)
         print(f"ia {rota} origem={self.headers.get('Origin')} tamanho={n/2**20:.1f}Mo", flush=True)
         if not n or n > 200 * 2**20: return self.responde(413, {"erreur": "vidéo trop grande (max 200 Mo)"})
