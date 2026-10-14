@@ -303,6 +303,10 @@ async function preparaTrecho(){
 }
 // ---- dentro da app Android: camara nativa de alta velocidade (o video volta com a velocidade real)
 // nova versao da app Android? (a pagina vem sempre do site; o APK so' muda quando ha' novidades na camara)
+// versao visivel (app e pagina), para saber o que esta' instalado
+(function(){ const h = document.querySelector("h1, .titulo, header"); const e = document.createElement("div"); e.className = "hint"; e.id = "versoes";
+  e.textContent = (window.Android && window.Android.versao ? "Appli " + window.Android.versao() + " · " : "") + "page " + (document.querySelector('meta[name="pv-versao"]')?.content || "pv-42");
+  (h && h.parentNode ? h.parentNode.insertBefore(e, h.nextSibling) : document.body.prepend(e)); })();
 if (window.Android && window.Android.versao){
   fetch("../app/versao.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.json()).then(j => {
     const n = v => String(v).split(".").map(x => parseInt(x) || 0), A = n(window.Android.versao()), N = n(j.versao);
