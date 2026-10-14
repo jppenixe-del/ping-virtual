@@ -15,7 +15,8 @@ pp.get = lambda u, essais=2: _get(u, essais)       # pedidos interativos: no max
 _dorme = time.sleep
 pp.time = type("T", (), {"sleep": staticmethod(lambda s: _dorme(min(s, 0.4)))})   # pedidos seguidos (um de cada vez), sem as pausas longas do cron
 
-ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767"}
+ORIGENS = {"https://jppenixe-del.github.io", "http://localhost:8767", "https://appassets.androidplatform.net"}
+PC_BOLA = "http://10.0.0.2:8791"     # IA da bola na RTX do PC do Joao (pelo tunel WireGuard)
 TRAVA = threading.Lock()
 CACHE = {}
 ADV = {}; EM_CURSO = set()
@@ -63,6 +64,7 @@ class H(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST"); self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
     def do_GET(self):
+        if self.path.startswith("/api/ia/ping"): return self.ia_ping()
         if self.path.startswith("/api/classement"): return self.classement()
         mf = re.fullmatch(r"/api/joueur/(\d{5,8})/fiche", self.path.split("?")[0])
         if mf: return self.ficha(mf.group(1))
@@ -77,6 +79,7 @@ class H(BaseHTTPRequestHandler):
         r = {"licence": lic, **f, "suivi": os.path.exists(f"data/{lic}.json")}
         CACHE[lic] = (time.time(), r); self.responde(200, r)
     def do_POST(self):
+        if self.path.startswith("/api/ia/analisa"): return self.ia_analisa()
         mm = re.fullmatch(r"/api/maj/(\d{5,8})", self.path.split("?")[0])
         if mm: return self.maj(mm.group(1))
         m = re.fullmatch(r"/api/joueur/(\d{5,8})", self.path.split("?")[0])
@@ -139,6 +142,24 @@ class H(BaseHTTPRequestHandler):
         except BaseException: return self.responde(502, {"erreur": "Ping Pocket ne répond pas, réessaie plus tard"})
         threading.Thread(target=publica, args=(lic,), daemon=True).start()
         self.responde(200, d)
+    def ia_ping(self):
+        import urllib.request
+        try:
+            with urllib.request.urlopen(PC_BOLA + "/ping", timeout=3) as r: return self.responde(200, json.load(r))
+        except Exception: return self.responde(503, {"ok": False, "erreur": "PC éteint"})
+    def ia_analisa(self):
+        """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens"""
+        import urllib.request
+        n = int(self.headers.get("Content-Length") or 0)
+        if not n or n > 200 * 2**20: return self.responde(413, {"erreur": "vidéo trop grande (max 200 Mo)"})
+        corpo = self.rfile.read(n)
+        try:
+            req = urllib.request.Request(PC_BOLA + "/analisa", data=corpo, headers={"Content-Type": "application/octet-stream"})
+            with urllib.request.urlopen(req, timeout=240) as r: b = r.read()
+        except Exception: return self.responde(503, {"erreur": "PC injoignable"})
+        self.send_response(200); self.cors()
+        self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b)))
+        self.end_headers(); self.wfile.write(b)
     def log_message(self, *a): pass
 
 if __name__ == "__main__":
