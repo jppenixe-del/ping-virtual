@@ -177,21 +177,32 @@ async function enviaPC(f){
   try {
     const p = await fetch(API_IA + "/ping", {signal: AbortSignal.timeout(8000)}); if (!p.ok){ PC_ERRO = "PC éteint (réponse " + p.status + ")"; return null; }
     etapa = `envoi de la vidéo (${Math.round(f.size/2**20)} Mo)`;
-    const r = await fetch(API_IA + "/analisa", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(300000)});
+    const r = await fetch(API_IA + "/envia", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(300000)});
     if (!r.ok){ let m = ""; try { m = (await r.json()).erreur || ""; } catch(_){} PC_ERRO = `le PC a refusé (${r.status}) ${m}`; return null; }
-    etapa = "lecture de la réponse";
-    const j = await r.json(); if (!(j.imagens && j.imagens.length)){ PC_ERRO = "le PC n'a pas pu lire la vidéo (format ?)"; return null; }
-    j.imagens.id = j.id; return j.imagens;
+    const j = await r.json(); if (!j.id || !j.n){ PC_ERRO = "le PC n'a pas pu lire la vidéo (format ?)"; return null; }
+    return {id: j.id, fps: j.fps, n: j.n, cache: {}};
   } catch(e){ PC_ERRO = `échec : ${etapa} — ${e.name === "TimeoutError" ? "trop long" : (e.message || e.name)}`; return null; }
 }
 let ARQV = null;
+async function rmPC(){
+  const info = PC_PROM ? await PC_PROM : null; if (!info) return null;
+  const chave = INTERV ? `${INTERV.a.toFixed(3)}-${isFinite(INTERV.b) ? INTERV.b.toFixed(3) : "fim"}` : "tudo";
+  if (info.cache[chave]) return info.cache[chave];
+  let q = `id=${info.id}`; if (INTERV){ q += `&a=${INTERV.a}`; if (isFinite(INTERV.b)) q += `&b=${INTERV.b}`; }
+  try {
+    const r = await fetch(API_IA + "/analisa_id?" + q, {signal: AbortSignal.timeout(240000)});
+    if (!r.ok){ PC_ERRO = "analyse refusée (" + r.status + ")"; return null; }
+    const j = await r.json(); if (!(j.imagens && j.imagens.length)) return null;
+    j.imagens.id = info.id; info.cache[chave] = j.imagens; return j.imagens;
+  } catch(e){ PC_ERRO = "analyse : " + (e.name === "TimeoutError" ? "trop long" : e.message); return null; }
+}
 function abreVideo(f){
   ARQV = f; PC_PROM = enviaPC(f);
   const pe = $("pcVideo");
   if (pe){
-    pe.textContent = PC_PROM && $("usaPC").checked ? "🖥️ Vidéo envoyée au PC (carte RTX) pour l'analyse…" : "";
+    pe.textContent = PC_PROM && $("usaPC").checked ? "🖥️ Envoi de la vidéo au PC (carte RTX)…" : "";
     const este = PC_PROM; PC_PROM.then(r => { if (PC_PROM !== este) return;
-      pe.textContent = r ? `🖥️ PC : analyse prête (${r.length} images) — appuie sur « 🔎 Détection automatique » ou « ⚡ Vitesse et effet »` : "🖥️ PC : " + (PC_ERRO || "injoignable") + " — l'analyse se fera sur le téléphone"; });
+      pe.textContent = r ? `🖥️ Vidéo sur le PC (${r.n} images). Marque ⏮ le début et ⏭ la fin du service, puis 🔎.` : "🖥️ PC : " + (PC_ERRO || "injoignable") + " — l'analyse se fera sur le téléphone"; });
   }
   QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
   v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";
@@ -659,7 +670,7 @@ async function detetaIA(){
   await garantePC();
   // com o PC ligado, as detecoes vem da RTX (todas as imagens do video, em resolucao total); senao, a IA corre aqui
   let RM = null;
-  if (PC_PROM){ $("estado").textContent = "Analyse sur le PC (RTX)…"; RM = await PC_PROM; }
+  if (PC_PROM){ $("estado").textContent = "Analyse de l'intervalle sur le PC (RTX)…"; RM = await rmPC(); }
   if (!RM){ $("estado").textContent = "Chargement du détecteur IA…"; await BolaIA.carrega(); }
   const NF = RM ? RM.length : QUAD.length, tF = i => RM ? RM[i].t : QUAD[i].t;
   const detF = async (i, x, y, w, h, lado, conf) => RM
@@ -955,7 +966,9 @@ async function autoDeteta(){
   $("usaPC").onchange = () => { try { localStorage.setItem("pvUsaPC", $("usaPC").checked ? "1" : "0"); } catch(e){}
     PC_PROM = $("usaPC").checked && ARQV ? enviaPC(ARQV) : null; if ($("usaPC").checked) ve(); };
 })();
+const precisaIntervalo = () => !INTERV && QUAD.length && QUAD[QUAD.length - 1].t > 3;
 $("autoDet").onclick = async () => {
+  if (precisaIntervalo()){ $("estado").textContent = "D'abord : va au début du service et appuie sur « ⏮ Début du service ici », puis à la fin (après la frappe) sur « ⏭ Fin ici »."; return; }
   $("autoDet").disabled = true;
   try {
     let ok = false, iaFoi = false;
@@ -985,13 +998,13 @@ $("intIni").onclick = () => { const t = agoraT(); INTERV = {a: t, b: INTERV && I
 $("intFim").onclick = () => { const t = agoraT(); INTERV = {a: INTERV && INTERV.a < t ? INTERV.a : 0, b: t}; mostraInterv(); };
 $("intLimpa").onclick = () => { INTERV = null; $("intTxt").textContent = "Intervalle effacé : toute la vidéo est analysée."; mostraInterv(); };
 $("coupToque").onclick = () => { MODO_COUP = true; $("coupEstado").textContent = "Va à l'image juste après le coup de raquette et touche la balle."; };
-$("coupBtn").onclick = () => medeCoup(null);
+$("coupBtn").onclick = () => { if (precisaIntervalo()){ $("coupEstado").textContent = "D'abord : marque le début et la fin du coup (⏮ / ⏭ plus haut)."; return; } medeCoup(null); };
 async function medeCoup(semente){
   await garantePC();
   const est = t => $("coupEstado").textContent = t;
   if (!QUAD.length){ est("Ouvre d'abord une vidéo."); return; }
   let RM = null;
-  if (PC_PROM){ est("Analyse sur le PC (RTX)…"); RM = await PC_PROM; }
+  if (PC_PROM){ est("Analyse de l'intervalle sur le PC (RTX)…"); RM = await rmPC(); }
   if (!RM){ est("Chargement du détecteur IA…"); await BolaIA.carrega(); }
   const NF = RM ? RM.length : QUAD.length, tF = i => RM ? RM[i].t : QUAD[i].t;
   const detF = async (i, x, y, w, h, lado, conf) => RM
