@@ -150,13 +150,14 @@ class H(BaseHTTPRequestHandler):
         except Exception: return self.responde(503, {"ok": False, "erreur": "PC éteint"})
     def ia_analisa(self, rota="/analisa", tipo="application/octet-stream"):
         """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens (ou a rotacao da bola)"""
-        import urllib.request
+        import urllib.request, urllib.error
         n = int(self.headers.get("Content-Length") or 0)
         if not n or n > 200 * 2**20: return self.responde(413, {"erreur": "vidéo trop grande (max 200 Mo)"})
         corpo = self.rfile.read(n)
         try:
             req = urllib.request.Request(PC_BOLA + rota, data=corpo, headers={"Content-Type": tipo})
             with urllib.request.urlopen(req, timeout=240) as r: b = r.read()
+        except urllib.error.HTTPError as e: return self.responde(e.code, {"erreur": "PC : " + e.read().decode(errors="replace")[:200]})
         except Exception: return self.responde(503, {"erreur": "PC injoignable"})
         self.send_response(200); self.cors()
         self.send_header("Content-Type", "application/json"); self.send_header("Content-Length", str(len(b)))
