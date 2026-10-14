@@ -80,6 +80,7 @@ class H(BaseHTTPRequestHandler):
         CACHE[lic] = (time.time(), r); self.responde(200, r)
     def do_POST(self):
         if self.path.startswith("/api/ia/analisa"): return self.ia_analisa()
+        if self.path.startswith("/api/ia/rotacao"): return self.ia_analisa("/rotacao", "application/json")
         mm = re.fullmatch(r"/api/maj/(\d{5,8})", self.path.split("?")[0])
         if mm: return self.maj(mm.group(1))
         m = re.fullmatch(r"/api/joueur/(\d{5,8})", self.path.split("?")[0])
@@ -147,14 +148,14 @@ class H(BaseHTTPRequestHandler):
         try:
             with urllib.request.urlopen(PC_BOLA + "/ping", timeout=3) as r: return self.responde(200, json.load(r))
         except Exception: return self.responde(503, {"ok": False, "erreur": "PC éteint"})
-    def ia_analisa(self):
-        """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens"""
+    def ia_analisa(self, rota="/analisa", tipo="application/octet-stream"):
+        """o video vai inteiro para o PC; a RTX devolve as detecoes da bola em todas as imagens (ou a rotacao da bola)"""
         import urllib.request
         n = int(self.headers.get("Content-Length") or 0)
         if not n or n > 200 * 2**20: return self.responde(413, {"erreur": "vidéo trop grande (max 200 Mo)"})
         corpo = self.rfile.read(n)
         try:
-            req = urllib.request.Request(PC_BOLA + "/analisa", data=corpo, headers={"Content-Type": "application/octet-stream"})
+            req = urllib.request.Request(PC_BOLA + rota, data=corpo, headers={"Content-Type": tipo})
             with urllib.request.urlopen(req, timeout=240) as r: b = r.read()
         except Exception: return self.responde(503, {"erreur": "PC injoignable"})
         self.send_response(200); self.cors()
