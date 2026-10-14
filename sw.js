@@ -1,5 +1,5 @@
 // Ping Virtuel: funciona sem internet (a app guarda-se no telemovel na primeira abertura)
-const VERSAO = "pv-31";
+const VERSAO = "pv-32";
 const APP = ["./", "index.html", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSAO).then(c => c.addAll(APP)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => {

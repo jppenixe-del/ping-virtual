@@ -106,6 +106,8 @@ a{color:var(--table)}
       </div>
       <div class="row" style="margin-top:8px" id="fpsRow"><span class="hint">Vitesse réelle de la vidéo :</span><input type="number" id="fpsIn" placeholder="images/s" style="width:110px"><span class="hint">(si connue : permet l'échelle par la gravité)</span></div>
       <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
+      <div class="row" style="margin-top:8px;align-items:center"><button class="btn ghost" id="intIni">⏮ Début du service ici</button><button class="btn ghost" id="intFim">⏭ Fin ici</button><button class="btn ghost" id="intLimpa" hidden>✕</button></div>
+      <div class="hint" id="intTxt">Vidéo avec plusieurs services ? Va au début du service à analyser (avant le lancer), appuie sur « Début », puis à la fin (après la frappe), « Fin ». L'analyse ne regarde que cet intervalle.</div>
       <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (IA)</button>
         <select id="tipoBola" aria-label="Balle"><option value="branca">Balle blanche</option><option value="laranja">Balle orange</option></select></div>
       <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="usaPC" checked> Analyse sur le PC (carte RTX), plus rapide et plus précise <span id="pcEstado"></span></label>
@@ -674,8 +676,9 @@ async function detetaIA(){
     }
   };
   let gAnt = cinzaM(0), nRec = 0;
-  if (RM){ for (let i = 0; i < NF; i++) (await detF(i, 0, 0, W, H, 0, 0.12)).forEach(d => vistos.push({...d, i, t: tF(i)})); }
+  if (RM){ for (let i = 0; i < NF; i++) if (dentroT(tF(i))) (await detF(i, 0, 0, W, H, 0, 0.12)).forEach(d => vistos.push({...d, i, t: tF(i)})); }
   else for (let i = passo; i < QUAD.length; i += passo){
+    if (!dentroT(QUAD[i].t)){ gAnt = cinzaM(i); continue; }
     const g = cinzaM(i), m = new Uint8Array(g.length);
     for (let p = 0; p < g.length; p++) if (Math.abs(g[p] - gAnt[p]) > 22) m[p] = 1;
     gAnt = g; const cands = [];
@@ -701,7 +704,7 @@ async function detetaIA(){
     abertas.forEach(tr => {
       const u = tr.p[tr.p.length - 1], w = tr.p[tr.p.length - 2], dt = tF(i) - u.t;
       const v = w ? {x: (u.x - w.x)/(u.t - w.t), y: (u.y - w.y)/(u.t - w.t)} : {x: 0, y: 0};
-      const pr = {x: u.x + v.x*dt, y: u.y + v.y*dt}, nI = Math.max(1, Math.round(dt/dtQ)), gate = w ? Math.max(15, u.w*1.5) + 0.3*Math.hypot(v.x, v.y)*dt : Math.min(80, Math.max(25, u.w*2.5)*nI);
+      const pr = {x: u.x + v.x*dt, y: u.y + v.y*dt}, nI = Math.max(1, Math.round(dt/dtQ)), gate = w ? Math.max(15, u.w*1.5) + 0.3*Math.hypot(v.x, v.y)*dt : Math.min(150, Math.max(25, u.w*2.5)*nI*Math.max(1, dtQ*60));
       let best = -1, bd = gate;
       cs.forEach((c, j) => { if (usadas.has(j)) return; const dd = Math.hypot(c.x - pr.x, c.y - pr.y); if (dd < bd){ bd = dd; best = j; } });
       if (best >= 0){ usadas.add(best); tr.p.push(cs[best]); tr.ult = i; }
@@ -727,11 +730,58 @@ async function detetaIA(){
     window.__iaDbg.sc = (window.__iaDbg.sc || []).concat([[P[0].i, sc, razG, sub, diam]]);
     if (sc > melhorS){ melhorS = sc; melhorT = {P: seg, diam}; }
   });
+  // procura direta da parabola (RANSAC): 3 deteções de imagens diferentes definem uma curva; fica a que trava como a gravidade
+  // para o tamanho da bola e passa por mais deteções seguras. Pontos falsos ou parados nao formam uma parabola destas.
+  {
+    // parado = ha' uma deteccao no mesmo sitio 6 imagens antes ou depois (no video inteiro, nao so' no intervalo)
+    const detsEm = i => RM ? (RM[i] ? RM[i].d.filter(d => d[4] >= 0.08).map(d => ({x: d[0]*W, y: d[1]*H})) : []) : (porI.get(i) || []);
+    const parado = v => [-6, -4, 4, 6].some(k => detsEm(v.i + k).some(e => Math.hypot(e.x - v.x, e.y - v.y) < Math.max(4, 0.25*Math.min(v.w, v.h))));
+    const ftR = fatorT(), mov = vistos.filter(v => !parado(v));
+    let melhorR = null, sR = 0, semente = 12345;
+    const rnd = () => { semente = (semente*1103515245 + 12345) % 2147483648; return semente/2147483648; };   // sorteio repetivel: o mesmo video da' sempre o mesmo resultado
+    const ajus3 = (a, b, c) => ajustaParab([a, b, c].map(p => ({...p, t: p.t*ftR})));
+    for (let k = 0; k < 15000 && mov.length >= 3; k++){
+      const tri = [mov[(rnd()*mov.length)|0], mov[(rnd()*mov.length)|0], mov[(rnd()*mov.length)|0]].sort((a, b) => a.t - b.t);
+      if (tri[0].i === tri[1].i || tri[1].i === tri[2].i || tri[2].t - tri[0].t > 0.6) continue;
+      const f = ajus3(...tri); if (!f || f.C <= 0) continue;
+      const diam = [tri[0], tri[1], tri[2]].map(p => Math.min(p.w, p.h)).sort((a, b) => a - b)[1];
+      const razG = f.C/(0.5*981*diam/4); if (razG < 0.35 || razG > 3) continue;
+      const tv = f.t0 - f.B/(2*f.C);                                   // vertice (tempo ja' corrigido)
+      const tolY = Math.max(6, 0.6*diam), tolX = Math.max(10, 1.2*diam);
+      const inl = []; let soma = 0;
+      for (const [i, cs] of porI){
+        const t = tF(i)*ftR; if (t < tri[0].t*ftR - 0.4 || t > tv + 0.15) continue;
+        let b = null, bd = 1e9; cs.forEach(c => { const dy = Math.abs(c.y - f.y(t)), dx = Math.abs(c.x - f.x(t)); if (dy < tolY && dx < tolX && dy + dx < bd){ bd = dy + dx; b = c; } });
+        if (b && !parado({...b, i})){ inl.push({...b, i, t: tF(i)}); soma += b.c; }
+      }
+      inl.sort((a, b) => a.t - b.t);
+      const subR = inl.length ? inl[0].y - f.y(tv) : 0;
+      if (inl.length < 4 || subR < diam || inl.filter(p => p.t*ftR < tv).length < 3) continue;
+      // seguidos (sem buracos grandes) e a mexer de imagem para imagem
+      let mau = false;
+      for (let q = 1; q < inl.length && !mau; q++){
+        const a = inl[q-1], b = inl[q];
+        if (b.t - a.t > Math.max(0.12, 3.5*dtQ)) mau = true;
+        else if (Math.abs(b.t*ftR - tv) > 0.06 && Math.hypot(b.x - a.x, b.y - a.y) < 0.15*diam) mau = true;
+      }
+      if (mau) continue;
+      const sc = soma*Math.min(1, subR/(3*diam))/(1 + Math.abs(Math.log(razG)));
+      if (sc > sR){ sR = sc; melhorR = {P: inl, diam}; }
+    }
+    window.__iaDbg.ransac = melhorR ? melhorR.P.map(p => [p.i, Math.round(p.x), Math.round(p.y), +p.c.toFixed(2)]) : null;
+    if (melhorR && (!melhorT || sR > melhorS*0.8)) melhorT = melhorR;
+  }
   if (!melhorT) return false;
   // passagem fina: todas as imagens do lancamento, num recorte a volta da posicao prevista
-  const P = melhorT.P, iA = Math.max(0, P[0].i - passo), iB = Math.min(NF - 1, P[P.length - 1].i + 2*passo);
+  const P = melhorT.P, iA = Math.max(0, P[0].i - passo);
+  // o fim: depois do topo previsto pela parabola (os ultimos pontos vistos podem ainda estar a subir)
+  let iB = Math.min(NF - 1, P[P.length - 1].i + 2*passo);
+  { const fv = ajustaParab(P);
+    if (fv && fv.C > 0){ const tv = fv.t0 - fv.B/(2*fv.C), tFim = tv + Math.max(0.08, 0.4*(tv - P[0].t));
+      while (iB < NF - 1 && tF(iB) < tFim && dentroT(tF(iB + 1))) iB++; } }
   const fx = ajustaParab(P), R = 96, gate = Math.max(15, 1.5*melhorT.diam), fino = [];
   for (let i = iA; i <= iB; i++){
+    if (!dentroT(tF(i))) continue;
     const t = tF(i), px = fx.x(t), py = fx.y(t);
     const perto = cs => { let b = null, bd = gate; cs.forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < bd){ bd = d; b = c; } }); return b; };
     // 1.o o que a procura geral ja' viu; senao, um recorte 192x192 a' volta da curva (sem mudar a escala), com limiar mais baixo
@@ -745,7 +795,7 @@ async function detetaIA(){
   }
   // para tras: a subida rapida logo a seguir a' mao (desfocada, a rede ve-a com menos certeza): segue imagem a imagem
   fino.sort((a, b) => a.i - b.i);
-  for (let falhas = 0, i = fino.length ? fino[0].i - 1 : -1; fino.length >= 2 && i >= 0 && falhas < 3; i--){
+  for (let falhas = 0, i = fino.length ? fino[0].i - 1 : -1; fino.length >= 2 && i >= 0 && falhas < 3 && dentroT(tF(i)); i--){
     const a = fino[0], b = fino[1], n = (a.i - i)/(b.i - a.i), px = a.x + (a.x - b.x)*n, py = a.y + (a.y - b.y)*n;
     const g = Math.max(10, 0.5*Math.hypot(a.x - b.x, a.y - b.y)*Math.max(1, a.i - i) + a.r);
     const x = Math.max(0, Math.min(W - 2*R, px - R)), y = Math.max(0, Math.min(H - 2*R, py - R));
@@ -783,8 +833,24 @@ async function detetaIA(){
   if (traj.length < 4) return false;
   if (!escala){ escala = 4/Math.max(2, 2*traj.map(p => p.r).sort((a, b) => a - b)[traj.length >> 1]); }
   soltura = traj[0]; topo = traj.reduce((a, p) => p.y < a.y ? p : a, traj[0]);
+  // a bola deixou de ser vista ainda a subir (fundo claro, saiu da imagem): o topo pela parabola, se ela travar como a gravidade
+  if (topo === traj[traj.length - 1] && traj.length >= 5){
+    const ftv2 = fatorT(), f = ajustaParab(traj.map(p => ({...p, t: p.t*ftv2})));
+    if (f && f.C > 0){
+      const tv = f.t0 - f.B/(2*f.C), ult = traj[traj.length - 1].t*ftv2, rg = f.C/(0.5*981*diamP/4);
+      if (tv > ult && tv - ult < 0.35 && rg > 0.4 && rg < 2.5) topo = {x: f.x(tv), y: f.y(tv), t: tv/ftv2, est: true};
+    }
+  }
+  // validacao exigente: mais vale dizer "nao encontrei" do que mostrar uma trajetoria inventada
+  const diamT = 2*traj.map(p => p.r).sort((a, b) => a - b)[traj.length >> 1];
+  const subT2 = soltura.y - topo.y;
+  if (traj.length < (dtQ > 1/45 ? 5 : 6) || subT2 < 2*diamT){ window.__iaDbg.rejeitado = "curto"; traj = []; topo = null; soltura = null; return false; }
   fase = 1; ULTIMO = null; await vaiPara(topo.t); mostraResultado();
-  return ULTIMO && ULTIMO.alt >= 3 && ULTIMO.alt <= 150;
+  const A2 = analisa(), escBola = 4/Math.max(2, diamT);
+  const coerente = !A2.pxcm_g || (escBola*A2.pxcm_g > 0.5 && escBola*A2.pxcm_g < 2);       // escala da bola vs. gravidade
+  const ok = ULTIMO && ULTIMO.alt >= 3 && ULTIMO.alt <= 150 && coerente;
+  if (!ok) window.__iaDbg.rejeitado = "incoerente " + (A2.pxcm_g ? (escBola*A2.pxcm_g).toFixed(2) : "");
+  return ok;
 }
 window.__pvIA = async () => { let ok; try { ok = await detetaIA(); } catch(e){ ok = 'ERRO ' + e; } return {ok, W, H, n: QUAD.length, dbg: window.__iaDbg, traj: (traj || []).map(p => [Math.round(p.x), Math.round(p.y)])}; };
 async function autoDeteta(){
@@ -898,6 +964,17 @@ $("autoDet").onclick = async () => {
 // Velocidade: inicio da trajetoria (x linear, y com a gravidade), escala pelo diametro da bola (4 cm).
 // Efeito: no PC, a linha desenhada na bola e' medida imagem a imagem em resolucao total.
 let MODO_COUP = false;
+// ---- intervalo marcado (inicio/fim do servico a analisar)
+let INTERV = null;
+const dentroT = t => !INTERV || (t >= INTERV.a - 0.01 && t <= INTERV.b + 0.01);
+function mostraInterv(){
+  $("intLimpa").hidden = !INTERV;
+  if (INTERV) $("intTxt").textContent = `Intervalle analysé : ${fmt(INTERV.a, 2)} s → ${isFinite(INTERV.b) ? fmt(INTERV.b, 2) + " s" : "fin"} (${isFinite(INTERV.b) ? fmt(INTERV.b - INTERV.a, 2) + " s" : "…"})`;
+  desenha();
+}
+$("intIni").onclick = () => { const t = agoraT(); INTERV = {a: t, b: INTERV && INTERV.b > t ? INTERV.b : Infinity}; mostraInterv(); };
+$("intFim").onclick = () => { const t = agoraT(); INTERV = {a: INTERV && INTERV.a < t ? INTERV.a : 0, b: t}; mostraInterv(); };
+$("intLimpa").onclick = () => { INTERV = null; $("intTxt").textContent = "Intervalle effacé : toute la vidéo est analysée."; mostraInterv(); };
 $("coupToque").onclick = () => { MODO_COUP = true; $("coupEstado").textContent = "Va à l'image juste après le coup de raquette et touche la balle."; };
 $("coupBtn").onclick = () => medeCoup(null);
 async function medeCoup(semente){
@@ -915,7 +992,7 @@ async function medeCoup(semente){
   // segue a bola para a frente a partir de um ponto (previsao linear, recorte a' volta)
   const segueRapida = async (i0, p0) => {
     const P = [{...p0, i: i0, t: tF(i0)}]; let falhas = 0;
-    for (let i = i0 + 1; i < NF && P.length < 40 && falhas < 3; i++){
+    for (let i = i0 + 1; i < NF && P.length < 40 && falhas < 3 && dentroT(tF(i)); i++){
       const a = P[P.length - 1], b = P[P.length - 2], dt = tF(i) - a.t;
       const v = b ? {x: (a.x - b.x)/(a.t - b.t), y: (a.y - b.y)/(a.t - b.t)} : {x: 0, y: 0};
       const px = a.x + v.x*dt, py = a.y + v.y*dt, g = b ? Math.max(20, 0.5*Math.hypot(v.x, v.y)*dt + 2*(a.r || 8)) : 120;
@@ -939,6 +1016,7 @@ async function medeCoup(semente){
     est("Recherche du coup…");
     let melhor = null, mv = 0;
     for (let i = 0; i < NF; i++){
+      if (!dentroT(tF(i))) continue;
       for (const d of RM[i].d){
         if (d[4] < 0.25) continue;
         const p0 = {x: d[0]*W, y: d[1]*H, r: Math.min(d[2]*W, d[3]*H)/2, w: d[2]*W, h: d[3]*H};
