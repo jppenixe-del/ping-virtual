@@ -107,6 +107,7 @@ a{color:var(--table)}
       <div class="row" style="margin-top:8px" id="gravRow" hidden><button class="btn" id="semRef">Sans repère : échelle par la gravité</button></div>
       <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (IA)</button>
         <select id="tipoBola" aria-label="Balle"><option value="branca">Balle blanche</option><option value="laranja">Balle orange</option></select></div>
+      <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="usaPC" checked> Analyse sur le PC (carte RTX), plus rapide et plus précise <span id="pcEstado"></span></label>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
@@ -146,7 +147,19 @@ let QUAD = [], idx = 0, FPS_ARQ = null;
 // indicada, os tempos sao corrigidos por FPS_ARQ/FPS_REAL antes da escala pela gravidade.
 const fatorT = () => (FPS_REAL && FPS_ARQ && Math.abs(FPS_REAL/FPS_ARQ - 1) > 0.15) ? FPS_ARQ/FPS_REAL : 1;
 const MAXQ = 900;
+const API_IA = "https://5-189-185-48.sslip.io/api/ia";
+let PC_PROM = null;
+async function enviaPC(f){
+  if (!f || f.size > 190*2**20 || ($("usaPC") && !$("usaPC").checked)) return null;
+  try {
+    const p = await fetch(API_IA + "/ping", {signal: AbortSignal.timeout(5000)}); if (!p.ok) return null;
+    const r = await fetch(API_IA + "/analisa", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(180000)});
+    if (!r.ok) return null; const j = await r.json(); return j.imagens && j.imagens.length ? j.imagens : null;
+  } catch(e){ return null; }
+}
+let ARQV = null;
 function abreVideo(f){
+  ARQV = f; PC_PROM = enviaPC(f);
   QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
   v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";
   v.onloadedmetadata = async () => {
@@ -390,12 +403,12 @@ function analisa(){
   // imagens repetidas (o navegador devolve por vezes a mesma imagem duas vezes ao avancar) saem da analise
   const ft = fatorT();
   const tp = traj.filter((p, i) => p.t != null && !(i && Math.abs(p.x - traj[i-1].x) < 0.01 && Math.abs(p.y - traj[i-1].y) < 0.01)).map(p => ({...p, t: p.t*ft}));
-  if (tp.length >= 6){
+  if (tp.length >= 6 && !traj.ia){
     let vmax = 0;
     // velocidade de subida em janelas de 2 intervalos; o lancamento e' o fim da janela mais rapida (fim do impulso da mao)
     for (let i = 2; i < tp.length; i++){ const dt = tp[i].t - tp[i-2].t; if (dt <= 0) continue; const vy = (tp[i-2].y - tp[i].y)/dt; if (vy > vmax && tp[i].y > topo.y + 2){ vmax = vy; iRel = i === 2 ? 0 : i - 1; } }   // ja' a subir desde o inicio: o 1.o ponto
   }
-  const rel = tp.length >= 6 ? tp[iRel] : soltura;
+  const rel = (tp.length >= 6 || traj.ia) ? tp[iRel] : soltura;
   // topo escondido (atras de algo da mesma cor) ou desfocado: vertice da parabola ajustada aos pontos DEPOIS do lancamento
   // so' o voo livre: do lancamento ate' pouco depois do topo visto (depois a bola pode ser batida pela raquete)
   let iTopObs = 0; tp.forEach((p, i) => { if (p.y < tp[iTopObs].y) iTopObs = i; });
@@ -607,21 +620,52 @@ const ajustaParab = seg => {      // y = A + B t + C t^2 e x = ax + bx t (minimo
   return {t0, A, B, C, ax, bx, res: Math.sqrt(res/seg.length), y: t => A + B*(t - t0) + C*(t - t0)**2, x: t => ax + bx*(t - t0)};
 };
 async function detetaIA(){
-  $("estado").textContent = "Chargement du détecteur IA…";
-  await BolaIA.carrega();
-  const dts = QUAD.slice(1).map((q, i) => q.t - QUAD[i].t).filter(d => d > 0).sort((a, b) => a - b);
+  // com o PC ligado, as detecoes vem da RTX (todas as imagens do video, em resolucao total); senao, a IA corre aqui
+  let RM = null;
+  if (PC_PROM){ $("estado").textContent = "Analyse sur le PC (RTX)…"; RM = await PC_PROM; }
+  if (!RM){ $("estado").textContent = "Chargement du détecteur IA…"; await BolaIA.carrega(); }
+  const NF = RM ? RM.length : QUAD.length, tF = i => RM ? RM[i].t : QUAD[i].t;
+  const detF = async (i, x, y, w, h, lado, conf) => RM
+    ? RM[i].d.map(d => ({x: d[0]*W, y: d[1]*H, w: d[2]*W, h: d[3]*H, c: d[4]})).filter(d => d.c >= conf && d.x >= x && d.x < x + w && d.y >= y && d.y < y + h)
+    : BolaIA.deteta(QUAD[i].bmp, x, y, w, h, lado, conf);
+  const dts = []; for (let i = 1; i < NF; i++){ const d = tF(i) - tF(i-1); if (d > 0) dts.push(d); } dts.sort((a, b) => a - b);
   const dtQ = dts.length ? dts[dts.length >> 1] : 1/30, passo = Math.max(1, Math.round(1/(60*dtQ)));
   // a imagem inteira em quadrados de 640 (ou do lado menor), sobrepostos
   const L = Math.min(W, H), tiles = [];
   if (H > W){ const n = Math.ceil(H/L - 0.15); for (let j = 0; j < n; j++) tiles.push([0, Math.round(j*(H - L)/Math.max(1, n - 1)), L, L]); }
   else { const n = Math.ceil(W/L - 0.15); for (let j = 0; j < n; j++) tiles.push([Math.round(j*(W - L)/Math.max(1, n - 1)), 0, L, L]); }
-  const vistos = [];
-  for (let i = 0; i < QUAD.length; i += passo){
-    let cs = [];
-    for (const [x, y, w, h] of tiles) cs.push(...await BolaIA.deteta(QUAD[i].bmp, x, y, w, h, 640, 0.12));
-    cs = cs.filter((a, j) => !cs.some((b, k) => k < j && Math.hypot(a.x - b.x, a.y - b.y) < 6));
-    cs.forEach(c => vistos.push({...c, i, t: QUAD[i].t}));
-    if ((i/passo) % 5 === 0){ $("estado").textContent = `IA : recherche de la balle… ${Math.round(100*i/QUAD.length)} %`; await new Promise(r => setTimeout(r)); }
+  // procura rapida: so' onde ha' movimento (diferenca entre imagens, barata) a IA olha, num recorte de 192 px a' volta
+  const vistos = [], LM = 160, km = W/LM, HM = Math.round(H/km), RC = 96;
+  const cm = document.createElement("canvas"); cm.width = LM; cm.height = HM; const xm = cm.getContext("2d", {willReadFrequently: true});
+  const cinzaM = i => { xm.drawImage(QUAD[i].bmp, 0, 0, LM, HM); const d = xm.getImageData(0, 0, LM, HM).data, g = new Int16Array(LM*HM); for (let p = 0, j = 0; p < g.length; p++, j += 4) g[p] = (d[j] + d[j+1] + d[j+2])/3; return g; };
+  const recortes = async (i, cands) => {
+    const fica = [];
+    const aBola = Math.max(4, (W*0.035/km)**2*0.8);      // area tipica da bola a' escala da procura
+    cands.sort((a, b) => Math.abs(Math.log(a.n/aBola)) - Math.abs(Math.log(b.n/aBola))).forEach(c => { if (fica.length < 6 && !fica.some(f => Math.abs(f.x - c.x) < RC*0.7 && Math.abs(f.y - c.y) < RC*0.7)) fica.push(c); });
+    for (const c of fica){
+      const x = Math.max(0, Math.min(W - 2*RC, c.x - RC)), y = Math.max(0, Math.min(H - 2*RC, c.y - RC));
+      (await detF(i, x, y, 2*RC, 2*RC, 2*RC, 0.12)).forEach(d => { if (!vistos.some(v => v.i === i && Math.hypot(v.x - d.x, v.y - d.y) < 6)) vistos.push({...d, i, t: tF(i)}); });
+    }
+  };
+  let gAnt = cinzaM(0), nRec = 0;
+  if (RM){ for (let i = 0; i < NF; i++) (await detF(i, 0, 0, W, H, 0, 0.12)).forEach(d => vistos.push({...d, i, t: tF(i)})); }
+  else for (let i = passo; i < QUAD.length; i += passo){
+    const g = cinzaM(i), m = new Uint8Array(g.length);
+    for (let p = 0; p < g.length; p++) if (Math.abs(g[p] - gAnt[p]) > 22) m[p] = 1;
+    gAnt = g; const cands = [];
+    for (let p = 0; p < m.length; p++){
+      if (m[p] !== 1) continue;
+      let n = 0, sx = 0, sy = 0, x0 = 1e9, x1 = -1, y0 = 1e9, y1 = -1; const pil = [p]; m[p] = 2;
+      while (pil.length){ const q = pil.pop(), x = q % LM, y = (q / LM) | 0; n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        if (x > 0 && m[q-1] === 1){ m[q-1] = 2; pil.push(q-1); } if (x < LM-1 && m[q+1] === 1){ m[q+1] = 2; pil.push(q+1); }
+        if (y > 0 && m[q-LM] === 1){ m[q-LM] = 2; pil.push(q-LM); } if (y < HM-1 && m[q+LM] === 1){ m[q+LM] = 2; pil.push(q+LM); } }
+      if (n < 3) continue;
+      // manchas grandes (braco, corpo): a bola pode estar na ponta -> recorte no topo da mancha
+      if (x1 - x0 > 40 || y1 - y0 > 40) cands.push({x: (sx/n)*km, y: (y0 + 6)*km, n: 1e5});
+      else cands.push({x: (sx/n)*km, y: (sy/n)*km, n});
+    }
+    await recortes(i, cands); nRec++;
+    if (nRec % 5 === 0){ $("estado").textContent = `IA : recherche de la balle… ${Math.round(100*i/NF)} %`; await new Promise(r => setTimeout(r)); }
   }
   // ligar as detecoes em trajetorias (posicao prevista pela velocidade)
   let abertas = [], fechadas = [];
@@ -629,7 +673,7 @@ async function detetaIA(){
   [...porI.keys()].sort((a, b) => a - b).forEach(i => {
     const cs = porI.get(i), usadas = new Set();
     abertas.forEach(tr => {
-      const u = tr.p[tr.p.length - 1], w = tr.p[tr.p.length - 2], dt = QUAD[i].t - u.t;
+      const u = tr.p[tr.p.length - 1], w = tr.p[tr.p.length - 2], dt = tF(i) - u.t;
       const v = w ? {x: (u.x - w.x)/(u.t - w.t), y: (u.y - w.y)/(u.t - w.t)} : {x: 0, y: 0};
       const pr = {x: u.x + v.x*dt, y: u.y + v.y*dt}, nI = Math.max(1, Math.round(dt/dtQ)), gate = w ? Math.max(15, u.w*1.5) + 0.3*Math.hypot(v.x, v.y)*dt : Math.min(80, Math.max(25, u.w*2.5)*nI);
       let best = -1, bd = gate;
@@ -659,16 +703,16 @@ async function detetaIA(){
   });
   if (!melhorT) return false;
   // passagem fina: todas as imagens do lancamento, num recorte a volta da posicao prevista
-  const P = melhorT.P, iA = Math.max(0, P[0].i - passo), iB = Math.min(QUAD.length - 1, P[P.length - 1].i + 2*passo);
+  const P = melhorT.P, iA = Math.max(0, P[0].i - passo), iB = Math.min(NF - 1, P[P.length - 1].i + 2*passo);
   const fx = ajustaParab(P), R = 96, gate = Math.max(15, 1.5*melhorT.diam), fino = [];
   for (let i = iA; i <= iB; i++){
-    const t = QUAD[i].t, px = fx.x(t), py = fx.y(t);
+    const t = tF(i), px = fx.x(t), py = fx.y(t);
     const perto = cs => { let b = null, bd = gate; cs.forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < bd){ bd = d; b = c; } }); return b; };
     // 1.o o que a procura geral ja' viu; senao, um recorte 192x192 a' volta da curva (sem mudar a escala), com limiar mais baixo
     let b = perto(porI.get(i) || []);
     if (!b){
       const x = Math.max(0, Math.min(W - 2*R, px - R)), y = Math.max(0, Math.min(H - 2*R, py - R));
-      b = perto(await BolaIA.deteta(QUAD[i].bmp, x, y, 2*R, 2*R, 2*R, 0.06));
+      b = perto(await detF(i, x, y, 2*R, 2*R, 2*R, 0.06));
     }
     if (b) fino.push({x: b.x, y: b.y, t, r: Math.min(b.w, b.h)/2, i});
     if (i % 10 === 0){ $("estado").textContent = `IA : suivi fin… ${Math.round(100*(i - iA)/(iB - iA + 1))} %`; await new Promise(r => setTimeout(r)); }
@@ -679,15 +723,37 @@ async function detetaIA(){
     const a = fino[0], b = fino[1], n = (a.i - i)/(b.i - a.i), px = a.x + (a.x - b.x)*n, py = a.y + (a.y - b.y)*n;
     const g = Math.max(10, 0.5*Math.hypot(a.x - b.x, a.y - b.y)*Math.max(1, a.i - i) + a.r);
     const x = Math.max(0, Math.min(W - 2*R, px - R)), y = Math.max(0, Math.min(H - 2*R, py - R));
-    let m = null, md = g; (await BolaIA.deteta(QUAD[i].bmp, x, y, 2*R, 2*R, 2*R, 0.05)).forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < md){ md = d; m = c; } });
-    if (m && m.y > a.y - 1){ fino.unshift({x: m.x, y: m.y, t: QUAD[i].t, r: Math.min(m.w, m.h)/2, i}); falhas = 0; } else falhas++;
+    let m = null, md = g; (await detF(i, x, y, 2*R, 2*R, 2*R, 0.05)).forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < md){ md = d; m = c; } });
+    if (m && m.y > a.y - 1){ fino.unshift({x: m.x, y: m.y, t: tF(i), r: Math.min(m.w, m.h)/2, i}); falhas = 0; } else falhas++;
   }
-  // corta antes da subida e depois de descer (a raquete bate na bola)
+  // voo livre: a parte da trajetoria que segue a parabola da gravidade. Comeca no topo e alarga para tras
+  // enquanto os pontos encaixam na curva; o 1.o ponto que ja' encaixa e' a largada (antes, a mao ainda empurra a bola)
+  if (fino.length < 4) return false;
+  const ftv = fatorT(), diamP = 2*fino.map(p => p.r).sort((a, b) => a - b)[fino.length >> 1];
+  const tol = Math.max(2.5, 0.2*diamP), aj = seg => ajustaParab(seg.map(p => ({...p, t: p.t*ftv})));
+  const resid = (f, p) => Math.abs(f.y(p.t*ftv) - p.y);
   let it = 0; fino.forEach((p, j) => { if (p.y < fino[it].y) it = j; });
-  let i0 = it; while (i0 > 0 && fino[i0-1].y >= fino[i0].y - 0.5) i0--;
-  let i1 = it; const sub = fino.length ? fino[i0].y - fino[it].y : 0;
-  while (i1 < fino.length - 1 && fino[i1+1].y < fino[it].y + Math.max(8, 0.2*sub)) i1++;
-  traj = fino.slice(i0, i1 + 1);
+  let i0 = Math.max(0, it - 2), i1 = Math.min(fino.length - 1, it + 2);
+  while (i1 - i0 < 3 && (i0 > 0 || i1 < fino.length - 1)){ if (i0 > 0) i0--; if (i1 - i0 < 3 && i1 < fino.length - 1) i1++; }
+  for (let k = i0 - 1; k >= 0; k--){
+    const f = aj(fino.slice(k, i1 + 1));
+    if (!f || f.C <= 0 || fino.slice(k, i1 + 1).some(p => resid(f, p) > tol)) break;
+    i0 = k;
+  }
+  // depois do topo: ate' a bola descer 30% da subida ou sair da curva (a raquete bate-lhe)
+  const subT = fino[i0].y - fino[it].y;
+  for (let k = i1 + 1; k < fino.length; k++){
+    if (fino[k].y > fino[it].y + 0.3*subT) break;
+    const f = aj(fino.slice(i0, k + 1)); if (!f || fino.slice(i0, k + 1).some(p => resid(f, p) > tol)) break;
+    i1 = k;
+  }
+  // e na largada a velocidade de subida e' maxima: se dentro do troco ha' um ponto claramente mais rapido, a largada e' ai'
+  { const vel = k => (fino[k-1].y - fino[k+1].y)/((fino[k+1].t - fino[k-1].t) || 1e-9);
+    let kb = -1, vb = 0; for (let k = i0 + 1; k < i0 + (it - i0)/2 && k < fino.length - 1; k++){ const v = vel(k); if (v > vb){ vb = v; kb = k; } }
+    const v0 = i0 > 0 ? vel(i0) : (fino[i0].y - fino[i0+1].y)/((fino[i0+1].t - fino[i0].t) || 1e-9);
+    if (kb > 0 && vb > 1.15*v0) i0 = kb; }
+  window.__iaDbg.fino = fino.map(p => [p.i, Math.round(p.x), Math.round(p.y)]); window.__iaDbg.cut = [i0, it, i1];
+  traj = fino.slice(i0, i1 + 1); traj.ia = true;
   if (traj.length < 4) return false;
   if (!escala){ escala = 4/Math.max(2, 2*traj.map(p => p.r).sort((a, b) => a - b)[traj.length >> 1]); }
   soltura = traj[0]; topo = traj.reduce((a, p) => p.y < a.y ? p : a, traj[0]);
@@ -778,13 +844,24 @@ async function autoDeteta(){
   if (!plausivel()) return naoAchou();
   $("estado").textContent = "Balle trouvée automatiquement : vérifie que la trajectoire orange suit bien la balle (sinon touche la balle). " + $("estado").textContent;
 }
+// estado do PC (ligado/desligado) e preferencia guardada
+(function(){
+  try { if (localStorage.getItem("pvUsaPC") === "0") $("usaPC").checked = false; } catch(e){}
+  const ve = () => fetch(API_IA + "/ping", {signal: AbortSignal.timeout(5000)}).then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(j => { $("pcEstado").textContent = j && j.ok ? "· 🟢 PC connecté" : "· ⚪ PC éteint (analyse sur le téléphone)"; });
+  ve();
+  $("usaPC").onchange = () => { try { localStorage.setItem("pvUsaPC", $("usaPC").checked ? "1" : "0"); } catch(e){}
+    PC_PROM = $("usaPC").checked && ARQV ? enviaPC(ARQV) : null; if ($("usaPC").checked) ve(); };
+})();
 $("autoDet").onclick = async () => {
   $("autoDet").disabled = true;
   try {
-    let ok = false;
-    try { ok = await detetaIA(); } catch(e){ console.warn("IA", e); }
+    let ok = false, iaFoi = false;
+    try { ok = await detetaIA(); iaFoi = true; } catch(e){ console.warn("IA", e); }
     if (ok) $("estado").textContent = "Balle trouvée par l'IA : vérifie que la trajectoire orange suit bien la balle (sinon touche la balle). " + $("estado").textContent;
-    else await autoDeteta();
+    else if (!iaFoi) await autoDeteta();          // sem IA (sem rede na 1.a vez): o metodo antigo
+    else { $("resultado").hidden = true; traj = []; topo = null; soltura = null; fase = 1; texto(); desenha();
+      $("estado").textContent = "L'IA n'a pas trouvé le lancer : va à l'image où la balle quitte la main et touche-la (ou « Marquer à la main »)."; }
   } finally { $("autoDet").disabled = false; }
 };
 
