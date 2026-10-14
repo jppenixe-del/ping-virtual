@@ -83,6 +83,7 @@ a{color:var(--table)}
       <p class="hint">Astuce : 2 à 3 secondes suffisent par service. Plus la vitesse (images/s) est haute, plus la mesure est précise.</p>
     </div>
     <span class="hint" id="info"></span>
+      <div class="row" style="margin-top:8px;align-items:center"><span class="hint">🔑 Code d'accès du PC :</span><input type="password" id="chaveIA" placeholder="ex. 7B5…" autocomplete="off" style="width:150px;text-transform:uppercase"><button class="btn ghost" id="chaveOk">OK</button><span class="hint" id="chaveEst"></span></div>
       <div class="hint" id="pcVideo" style="color:var(--ok, #3ecf8e)"></div>
   </div>
 
@@ -111,7 +112,6 @@ a{color:var(--table)}
       <div class="row" style="margin-top:8px"><button class="btn" id="autoDet">🔎 Détection automatique (IA)</button>
         <select id="tipoBola" aria-label="Balle"><option value="branca">Balle blanche</option><option value="laranja">Balle orange</option></select></div>
       <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="usaPC" checked> Analyse sur le PC (carte RTX), plus rapide et plus précise <span id="pcEstado"></span></label>
-      <div class="row" style="margin-top:4px;align-items:center"><input type="password" id="chaveIA" placeholder="Code d'accès du PC" autocomplete="off" style="width:170px;text-transform:uppercase"><button class="btn ghost" id="chaveOk">OK</button></div>
       <div class="row" style="margin-top:8px"><button class="btn ghost" id="refazer">Recommencer ce service</button><button class="btn ghost" id="refCal">Refaire le calibrage</button><button class="btn ghost" id="manual">Marquer à la main</button></div>
       <div class="hint" id="estado"></div>
     </div>
@@ -1007,7 +1007,7 @@ async function autoDeteta(){
 (function(){
   try { if (localStorage.getItem("pvUsaPC") === "0") $("usaPC").checked = false; } catch(e){}
   const ve = () => pingIA()
-    .then(j => { $("pcEstado").textContent = !(j && j.ok) ? "· ⚪ PC éteint (analyse sur le téléphone)" : j.code ? "· 🟢 PC connecté" : "· 🟠 PC allumé — entre le code d'accès"; });
+    .then(j => { $("chaveEst").textContent = !(j && j.ok) ? "PC éteint" : j.code ? "✅ code accepté" : (chaveIA() ? "❌ code refusé" : ""); $("pcEstado").textContent = !(j && j.ok) ? "· ⚪ PC éteint (analyse sur le téléphone)" : j.code ? "· 🟢 PC connecté" : "· 🟠 PC allumé — entre le code d'accès"; });
   $("chaveIA").value = chaveIA();
   $("chaveOk").onclick = () => { try { localStorage.setItem("pvChaveIA", $("chaveIA").value.trim().toUpperCase()); } catch(e){}
     ve(); if (ARQV && $("usaPC").checked) PC_PROM = enviaPC(ARQV); };
