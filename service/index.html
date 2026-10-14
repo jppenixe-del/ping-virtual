@@ -153,7 +153,12 @@ let W = 0, H = 0, PASSO = 1/60;
 let fase = 0, cal = [], escala = null, traj = [], soltura = null, topo = null, manualFase = 0;
 const fmt = (n, d=1) => (Math.round(n*10**d)/10**d).toString().replace(".", ",");
 
-$("arq").onchange = e => { const f = e.target.files[0]; if (!f) return; FPS_REAL = null; PASSO = 1/60; abreVideo(f); };
+// qualquer erro da pagina aparece no ecra (para as capturas)
+window.addEventListener("error", e => { const i = document.getElementById("info"); if (i) i.textContent = "⚠ " + (e.message || e) + (e.lineno ? " (l." + e.lineno + ")" : ""); });
+window.addEventListener("unhandledrejection", e => { const i = document.getElementById("info"); if (i) i.textContent = "⚠ " + ((e.reason && e.reason.message) || e.reason); });
+$("arq").onclick = () => { $("info").textContent = "Choix de la vidéo…"; };
+$("arq").onchange = e => { const f = e.target.files[0]; if (!f){ $("info").textContent = "Aucune vidéo reçue (choix annulé ?)"; return; }
+  $("info").textContent = `Vidéo reçue : ${f.name || "vidéo"} · ${Math.round(f.size/2**20)} Mo · ${f.type || "type ?"}`; FPS_REAL = null; PASSO = 1/60; abreVideo(f); };
 let FPS_REAL = null;
 // Todas as imagens do video ficam em memoria (extraidas uma vez, a tocar o video devagar): assim anda-se para a frente
 // e para tras sem depender do "seek" do navegador (que em muitos videos de telemovel so' funciona para a frente).
@@ -222,7 +227,8 @@ function abreVideo(f){
       pe.textContent = r ? `🖥️ Vidéo sur le PC (${r.n} images). Marque ⏮ le début et ⏭ la fin du service, puis 🔎.` : "🖥️ PC : " + (PC_ERRO || "injoignable") + " — l'analyse se fera sur le téléphone"; });
   }
   QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
-  v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";
+  v.onerror = () => { $("info").textContent = `⚠ Le téléphone ne lit pas cette vidéo (${f.type || "format ?"}, ${Math.round(f.size/2**20)} Mo). Essaie « 📱 Caméra rapide » ou une vidéo en H.264.`; };
+  v.src = URL.createObjectURL(f); $("info").textContent = `Chargement de la vidéo (${Math.round(f.size/2**20)} Mo)…`;
   v.onloadedmetadata = async () => {
     const lw = Math.min(640, v.videoWidth); W = lw; H = Math.round(v.videoHeight*lw/v.videoWidth);
     cv.width = W; cv.height = H;
@@ -305,7 +311,7 @@ async function preparaTrecho(){
 // nova versao da app Android? (a pagina vem sempre do site; o APK so' muda quando ha' novidades na camara)
 // versao visivel (app e pagina), para saber o que esta' instalado
 (function(){ const h = document.querySelector("h1, .titulo, header"); const e = document.createElement("div"); e.className = "hint"; e.id = "versoes";
-  e.textContent = (window.Android && window.Android.versao ? "Appli " + window.Android.versao() + " · " : "") + "page " + (document.querySelector('meta[name="pv-versao"]')?.content || "pv-43");
+  e.textContent = (window.Android && window.Android.versao ? "Appli " + window.Android.versao() + " · " : "") + "page " + (document.querySelector('meta[name="pv-versao"]')?.content || "pv-44");
   (h && h.parentNode ? h.parentNode.insertBefore(e, h.nextSibling) : document.body.prepend(e)); })();
 if (window.Android && window.Android.versao){
   fetch("../app/versao.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.json()).then(j => {
