@@ -522,7 +522,8 @@ $("tol").oninput = () => { if (fase === 2) mostraResultado(); };
 // cor da bola que mudaram desde a imagem anterior -> posicao da bola. Uma subida seguida de descida = um lancamento:
 // lancamento no fim do impulso (velocidade maxima), topo, escala pela gravidade (9,81 m/s2) -> altura e angulo.
 const D = {on:false, st:null, vid:null, cv:null, cx:null, low:null, lx:null, prev:null, cor:[255,122,26], escolheCor:false,
-           pts:[], ult:null, rec:null, partes:[], t0rec:null, servs:[], fpsFonte:30};
+           pts:[], ult:null, rec:null, partes:[], t0rec:null, servs:[], fpsFonte:30, anel:[]};
+window.__pvD = D;
 const LW = 240;   // largura da analise
 function pedeCamera(){
   const [w, h] = ($("resol").value || "1920x1080").split("x").map(Number);
@@ -535,6 +536,7 @@ function pedeCamera(){
   });
 }
 $("dirAbre").onclick = async () => {
+  if (window.BolaIA) BolaIA.carrega().catch(() => {});      // a IA que confirma cada lancamento (carrega enquanto a camara abre)
   try {
     D.st = await pedeCamera();
   } catch(e){ alert("Caméra indisponible : " + e.name); return; }
@@ -571,6 +573,13 @@ function quadro(agora, meta){
     }
   }
   D.prev = im;
+  if (window.BolaIA && D.vid.videoWidth){
+    const k = D.vid.videoWidth > 640 ? 640/D.vid.videoWidth : 1;
+    createImageBitmap(D.vid, {resizeWidth: Math.round(D.vid.videoWidth*k), resizeHeight: Math.round(D.vid.videoHeight*k)}).then(b => {
+      D.anel.push({t, bmp: b});
+      while (D.anel.length && t - D.anel[0].t > 1.6){ const v = D.anel.shift(); v.bmp.close && v.bmp.close(); }
+    }).catch(() => {});
+  }
   if (n >= 2 && n < W*H/150){
     const p = {t, x: sx/n, y: sy/n};
     const u = D.pts[D.pts.length - 1];
@@ -604,6 +613,28 @@ function detetaServico(){
   if (alt < 4 || alt > 150) return;
   const tol = parseFloat($("tol").value) || 30, ok = alt >= 16 && ang <= tol;
   const sv = {alt, ang, ok, rel, top, traj: seg.slice(), quando: performance.now(), tRec: D.rec && D.t0rec != null ? (performance.now() - D.t0rec)/1000 : null};
+  // a IA confirma que e' mesmo uma bola em voo (o detetor rapido apanha maos, reflexos, objetos a mexer)
+  D.cands = (D.cands || []).slice(-20).concat([sv]); confirmaIA(sv, D.low.width).then(r => { sv.aceite = r; if (r) registaServico(sv); });
+}
+async function confirmaIA(sv, Wlow){
+  if (!window.BolaIA) return true;
+  try { await BolaIA.carrega(); } catch(e){ return true; }       // sem IA (sem rede na 1.a vez): fica o detetor rapido
+  const pts = sv.traj, esc = pts.length > 4 ? [0, Math.floor(pts.length/3), Math.floor(2*pts.length/3), pts.length - 1] : pts.map((_, i) => i);
+  let vistos = 0, testados = 0, diams = [];
+  for (const j of esc){
+    const p = pts[j], f = D.anel.reduce((a, q) => !a || Math.abs(q.t - p.t) < Math.abs(a.t - p.t) ? q : a, null);
+    if (!f || Math.abs(f.t - p.t) > 0.03) continue;
+    const k = f.bmp.width/Wlow, x = p.x*k, y = p.y*k, R = 96;
+    const cs = await BolaIA.deteta(f.bmp, Math.max(0, Math.min(f.bmp.width - 2*R, x - R)), Math.max(0, Math.min(f.bmp.height - 2*R, y - R)), 2*R, 2*R, 2*R, 0.15);
+    testados++;
+    const b = cs.find(c => Math.hypot(c.x - x, c.y - y) < Math.max(25, 3*Math.min(c.w, c.h)));
+    if (b){ vistos++; diams.push(Math.min(b.w, b.h)/k); }
+  }
+  sv.ia = {vistos, testados};
+  return testados >= 2 && vistos >= Math.max(2, testados - 1);
+}
+function registaServico(sv){
+  const {alt, ang, ok} = sv;
   D.servs.push(sv); D.ult = sv;
   $("dirCont").textContent = `${D.servs.length} service${D.servs.length > 1 ? "s" : ""} · ${D.servs.filter(x => x.ok).length} ✅`;
   sinal(ok);
