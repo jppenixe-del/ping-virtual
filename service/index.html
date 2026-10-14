@@ -872,8 +872,26 @@ async function detetaIA(){
   // voo livre: a parte da trajetoria que segue a parabola da gravidade. Comeca no topo e alarga para tras
   // enquanto os pontos encaixam na curva; o 1.o ponto que ja' encaixa e' a largada (antes, a mao ainda empurra a bola)
   if (fino.length < 4) return false;
+  // so' o troco continuo da bola: a partir do ponto mais seguro da trajetoria escolhida, para a frente e para tras,
+  // enquanto os pontos seguem sem saltos (depois de a bola sair da imagem, apanham-se outras coisas)
+  {
+    const st = fino.slice(1).map((p, j) => Math.hypot(p.x - fino[j].x, p.y - fino[j].y)).sort((a, b) => a - b), med = st[st.length >> 1] || 10;
+    const ancora = P.reduce((a, p) => p.c > a.c ? p : a, P[0]);
+    let k0 = fino.findIndex(p => p.i === ancora.i); if (k0 < 0) k0 = fino.length >> 1;
+    const liga = (a, b) => Math.abs(b.i - a.i) <= 4 && Math.hypot(b.x - a.x, b.y - a.y) <= Math.max(3*med, 2*a.r*2, 25)*Math.max(1, Math.abs(b.i - a.i)/2);
+    // e o ponto seguinte tem de estar onde a velocidade da bola o poe (nao basta estar perto)
+    const prevOk = (a0, a, b) => { if (!a0) return true; const n = (b.i - a.i)/Math.max(1, a.i - a0.i);
+      const px = a.x + (a.x - a0.x)*n, py = a.y + (a.y - a0.y)*n; return Math.hypot(b.x - px, b.y - py) <= Math.max(2.5*a.r, 0.6*Math.hypot(a.x - a0.x, a.y - a0.y)*n, 15); };
+    let ka = k0, kb = k0;
+    while (ka > 0 && liga(fino[ka - 1], fino[ka])) ka--;          // para tras so' a distancia (na largada a mao muda a velocidade)
+    while (kb < fino.length - 1 && liga(fino[kb], fino[kb + 1]) && prevOk(fino[kb - 1], fino[kb], fino[kb + 1])) kb++;
+    fino.splice(kb + 1); fino.splice(0, ka);
+    if (fino.length < 4) return false;
+  }
   const ftv = fatorT(), diamP = 2*fino.map(p => p.r).sort((a, b) => a - b)[fino.length >> 1];
-  const tol = Math.max(2.5, 0.2*diamP), aj = seg => ajustaParab(seg.map(p => ({...p, t: p.t*ftv})));
+  // tolerancia da curva: cresce com a velocidade (uma bola rapida fica arrastada e o centro detetado oscila mais)
+  const passos = fino.slice(1).map((p, j) => Math.hypot(p.x - fino[j].x, p.y - fino[j].y)).sort((a, b) => a - b);
+  const tol = Math.max(2.5, 0.2*diamP, 0.28*(passos[passos.length >> 1] || 0)), aj = seg => ajustaParab(seg.map(p => ({...p, t: p.t*ftv})));
   const resid = (f, p) => Math.abs(f.y(p.t*ftv) - p.y);
   let it = 0; fino.forEach((p, j) => { if (p.y < fino[it].y) it = j; });
   let i0 = Math.max(0, it - 2), i1 = Math.min(fino.length - 1, it + 2);
@@ -1018,6 +1036,7 @@ async function autoDeteta(){
 })();
 const precisaIntervalo = () => !INTERV && QUAD.length && QUAD[QUAD.length - 1].t > 3;
 $("autoDet").onclick = async () => {
+  if (!QUAD.length){ $("estado").textContent = "Cette vidéo ne se lit pas sur cet appareil (format HEVC/H.265 ?). Filme en H.264 (« Le plus compatible » dans les réglages de l'appareil photo) ou utilise « 📱 Caméra rapide »."; return; }
   if (precisaIntervalo()){ $("estado").textContent = "D'abord : va au début du service et appuie sur « ⏮ Début du service ici », puis à la fin (après la frappe) sur « ⏭ Fin ici »."; return; }
   $("autoDet").disabled = true;
   try {
