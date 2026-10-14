@@ -83,6 +83,7 @@ a{color:var(--table)}
       <p class="hint">Astuce : 2 à 3 secondes suffisent par service. Plus la vitesse (images/s) est haute, plus la mesure est précise.</p>
     </div>
     <span class="hint" id="info"></span>
+      <div id="appNova" hidden style="margin-top:8px;padding:10px;border-radius:10px;background:#1f6f43;color:#fff">📲 Nouvelle version de l'appli : <b id="appNovaV"></b> <button class="btn" id="appNovaB" style="margin-left:6px">Mettre à jour</button></div>
       <div class="row" style="margin-top:8px;align-items:center"><span class="hint">🔑 Code d'accès du PC :</span><input type="password" id="chaveIA" placeholder="ex. 7B5…" autocomplete="off" style="width:150px;text-transform:uppercase"><button class="btn ghost" id="chaveOk">OK</button><span class="hint" id="chaveEst"></span></div>
       <div class="hint" id="pcVideo" style="color:var(--ok, #3ecf8e)"></div>
   </div>
@@ -141,7 +142,7 @@ a{color:var(--table)}
   <p class="hint" style="margin-top:14px">Conseils : caméra à hauteur de la main, perpendiculaire au lancer, fond uni et balle orange si possible. L'arbitrage vidéo (TTR) accepte jusqu'à 30° par rapport à la verticale : c'est la tolérance par défaut, réglable ci-dessus.</p>
 </div>
 
-<script src="ia/bolaia.js"></script>
+<script src="ia/bolaia.js?v=39"></script>
 <script>
 (function(){
 const $ = id => document.getElementById(id);
@@ -260,6 +261,17 @@ function extrai(){
 }
 function mostra(i){ idx = Math.max(0, Math.min(QUAD.length - 1, i)); desenha(); }
 // ---- dentro da app Android: camara nativa de alta velocidade (o video volta com a velocidade real)
+// nova versao da app Android? (a pagina vem sempre do site; o APK so' muda quando ha' novidades na camara)
+if (window.Android && window.Android.versao){
+  fetch("../app/versao.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.json()).then(j => {
+    const n = v => String(v).split(".").map(x => parseInt(x) || 0), A = n(window.Android.versao()), N = n(j.versao);
+    let maior = false; for (let i = 0; i < Math.max(A.length, N.length); i++){ if ((N[i] || 0) !== (A[i] || 0)){ maior = (N[i] || 0) > (A[i] || 0); break; } }
+    if (!maior) return;
+    $("appNovaV").textContent = j.versao + (j.notas ? " — " + j.notas : ""); $("appNova").hidden = false;
+    $("appNovaB").onclick = () => { if (window.Android.abreUrl) window.Android.abreUrl(j.apk);
+      else { $("appNovaV").innerHTML = j.versao + " — ouvre ce lien dans Chrome pour l'installer : <br><span style='user-select:all;word-break:break-all'>" + j.apk + "</span>"; } };
+  }).catch(() => {});
+}
 if (window.Android && window.Android.camera240){
   $("camNativa").hidden = false; $("camNativa").onclick = () => window.Android.camera240();
   // plano B: a camara do proprio telemovel em modo Ralenti 1/8x; ao voltar, o ultimo video abre aqui
