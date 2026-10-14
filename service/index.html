@@ -74,7 +74,7 @@ a{color:var(--table)}
 
   <div class="card" style="margin-top:12px">
     <div class="etapa">1. Filme le service <b>de côté</b>, téléphone posé, ou choisis une vidéo.</div>
-    <div class="row"><button class="btn" id="camNativa" hidden style="background:var(--ball)">📱 Caméra rapide (jusqu'à 240 i/s)</button><button class="btn" id="abreCam">🎥 Filmer (HD, haute vitesse)</button>
+    <div class="row"><button class="btn" id="camNativa" hidden style="background:var(--ball)">📱 Caméra rapide (jusqu'à 240 i/s)</button><button class="btn" id="camRalenti" hidden>🐢 Ralenti du Pixel (240 i/s)</button><button class="btn" id="abreCam">🎥 Filmer (HD, haute vitesse)</button>
       <label class="btn ghost" style="cursor:pointer">📁 Choisir une vidéo<input type="file" id="arq" accept="video/*" hidden></label></div>
     <div id="camZona" hidden style="margin-top:10px">
       <div class="stage"><video id="prev" autoplay muted playsinline style="display:block;width:100%"></video></div>
@@ -112,6 +112,16 @@ a{color:var(--table)}
       <div class="hint" id="estado"></div>
     </div>
 
+    <div class="card" id="coupZona" style="margin-top:12px">
+      <b>⚡ Vitesse et effet du coup</b>
+      <p class="hint">Filme <b>de côté</b> (la balle doit traverser l'image). Pour mesurer l'effet : trace au feutre noir une ligne tout autour de la balle et filme en 240 images/s ; l'analyse de l'effet se fait sur le PC.</p>
+      <div class="row"><button class="btn" id="coupBtn">⚡ Mesurer vitesse et effet</button><button class="btn ghost" id="coupToque">Toucher la balle après le coup</button></div>
+      <div class="res" id="coupRes" hidden>
+        <div><span>Vitesse</span><b class="num" id="vVel">—</b><span id="tVel"></span></div>
+        <div><span>Effet</span><b class="num" id="vRot">—</b><span id="tRot"></span></div>
+      </div>
+      <div class="hint" id="coupEstado"></div>
+    </div>
     <div id="resultado" hidden>
       <div class="res">
         <div id="rAlt"><span>Hauteur du lancer</span><b class="num" id="vAlt">—</b><span id="tAlt"></span></div>
@@ -154,7 +164,7 @@ async function enviaPC(f){
   try {
     const p = await fetch(API_IA + "/ping", {signal: AbortSignal.timeout(5000)}); if (!p.ok) return null;
     const r = await fetch(API_IA + "/analisa", {method: "POST", body: f, headers: {"Content-Type": "application/octet-stream"}, signal: AbortSignal.timeout(180000)});
-    if (!r.ok) return null; const j = await r.json(); return j.imagens && j.imagens.length ? j.imagens : null;
+    if (!r.ok) return null; const j = await r.json(); if (!(j.imagens && j.imagens.length)) return null; j.imagens.id = j.id; return j.imagens;
   } catch(e){ return null; }
 }
 let ARQV = null;
@@ -202,11 +212,13 @@ function mostra(i){ idx = Math.max(0, Math.min(QUAD.length - 1, i)); desenha(); 
 // ---- dentro da app Android: camara nativa de alta velocidade (o video volta com a velocidade real)
 if (window.Android && window.Android.camera240){
   $("camNativa").hidden = false; $("camNativa").onclick = () => window.Android.camera240();
+  // plano B: a camara do proprio telemovel em modo Ralenti 1/8x; ao voltar, o ultimo video abre aqui
+  if (window.Android.ralenti){ $("camRalenti").hidden = false; $("camRalenti").onclick = () => { $("info").textContent = "Dans la caméra : choisis « Ralenti » 1/8× (240 i/s), filme, puis reviens ici."; window.Android.ralenti(); }; }
 }
 window.pvVideoNativo = async (url, fps, info) => {
   try {
     const b = await (await fetch(url)).blob();
-    FPS_REAL = fps; PASSO = 1/fps; $("fpsIn").value = fps;
+    if (fps > 0){ FPS_REAL = fps; PASSO = 1/fps; $("fpsIn").value = fps; } else { FPS_REAL = null; PASSO = 1/60; }
     abreVideo(new File([b], "camera.mp4", {type: "video/mp4"}));
     setTimeout(() => { $("info").textContent = info + " · " + $("info").textContent; }, 50);
   } catch(e){ $("info").textContent = "Vidéo introuvable : " + e; }
@@ -275,6 +287,7 @@ $("manual").onclick = () => { if (!escala) { $("estado").textContent = "Fais d'a
 function pos(e){ const r = cv.getBoundingClientRect(); return {x: (e.clientX - r.left)*W/r.width, y: (e.clientY - r.top)*H/r.height}; }
 cv.addEventListener("pointerdown", async e => {
   const p = pos(e);
+  if (MODO_COUP){ MODO_COUP = false; return medeCoup({x: p.x, y: p.y, t: agoraT()}); }
   if (fase === 0 && $("ref").value === "4"){
     const img = cx.getImageData(0, 0, W, H).data, cor = amostraCor(img, p.x, p.y);
     // pixeis da cor da bola ligados ao ponto tocado (enchimento), num raio de 60 px
@@ -864,6 +877,90 @@ $("autoDet").onclick = async () => {
       $("estado").textContent = "L'IA n'a pas trouvé le lancer : va à l'image où la balle quitte la main et touche-la (ou « Marquer à la main »)."; }
   } finally { $("autoDet").disabled = false; }
 };
+
+
+// ---------------------------------------------------------------- VELOCIDADE E EFEITO DO GOLPE
+// A bola depois do toque da raquete: deteções da IA (PC ou telemovel) ligadas numa trajetoria rapida.
+// Velocidade: inicio da trajetoria (x linear, y com a gravidade), escala pelo diametro da bola (4 cm).
+// Efeito: no PC, a linha desenhada na bola e' medida imagem a imagem em resolucao total.
+let MODO_COUP = false;
+$("coupToque").onclick = () => { MODO_COUP = true; $("coupEstado").textContent = "Va à l'image juste après le coup de raquette et touche la balle."; };
+$("coupBtn").onclick = () => medeCoup(null);
+async function medeCoup(semente){
+  const est = t => $("coupEstado").textContent = t;
+  if (!QUAD.length){ est("Ouvre d'abord une vidéo."); return; }
+  let RM = null;
+  if (PC_PROM){ est("Analyse sur le PC (RTX)…"); RM = await PC_PROM; }
+  if (!RM){ est("Chargement du détecteur IA…"); await BolaIA.carrega(); }
+  const NF = RM ? RM.length : QUAD.length, tF = i => RM ? RM[i].t : QUAD[i].t;
+  const detF = async (i, x, y, w, h, lado, conf) => RM
+    ? RM[i].d.map(d => ({x: d[0]*W, y: d[1]*H, w: d[2]*W, h: d[3]*H, c: d[4]})).filter(d => d.c >= conf && d.x >= x && d.x < x + w && d.y >= y && d.y < y + h)
+    : BolaIA.deteta(QUAD[i].bmp, Math.max(0, Math.min(W - w, x)), Math.max(0, Math.min(H - h, y)), w, h, lado, conf);
+  const iDe = t => { let m = 0; for (let i = 1; i < NF; i++) if (Math.abs(tF(i) - t) < Math.abs(tF(m) - t)) m = i; return m; };
+  // segue a bola para a frente a partir de um ponto (previsao linear, recorte a' volta)
+  const segueRapida = async (i0, p0) => {
+    const P = [{...p0, i: i0, t: tF(i0)}]; let falhas = 0;
+    for (let i = i0 + 1; i < NF && P.length < 40 && falhas < 3; i++){
+      const a = P[P.length - 1], b = P[P.length - 2], dt = tF(i) - a.t;
+      const v = b ? {x: (a.x - b.x)/(a.t - b.t), y: (a.y - b.y)/(a.t - b.t)} : {x: 0, y: 0};
+      const px = a.x + v.x*dt, py = a.y + v.y*dt, g = b ? Math.max(20, 0.5*Math.hypot(v.x, v.y)*dt + 2*(a.r || 8)) : 120;
+      const R = Math.min(160, Math.max(96, g*1.5));
+      let m = null, md = g;
+      (await detF(i, px - R, py - R, 2*R, 2*R, 2*Math.round(R/32)*32, 0.08)).forEach(c => { const d = Math.hypot(c.x - px, c.y - py); if (d < md){ md = d; m = c; } });
+      if (!m){ falhas++; continue; }
+      falhas = 0; P.push({x: m.x, y: m.y, r: Math.min(m.w, m.h)/2, w: m.w, h: m.h, i, t: tF(i)});
+      if (m.x < 0 || m.x > W || m.y < 0 || m.y > H) break;
+    }
+    return P;
+  };
+  let P = null;
+  if (semente){
+    const i0 = iDe(semente.t), cs = await detF(i0, semente.x - 60, semente.y - 60, 120, 120, 128, 0.05);
+    let b = null, bd = 60; cs.forEach(c => { const d = Math.hypot(c.x - semente.x, c.y - semente.y); if (d < bd){ bd = d; b = c; } });
+    const p0 = b ? {x: b.x, y: b.y, r: Math.min(b.w, b.h)/2, w: b.w, h: b.h} : {x: semente.x, y: semente.y, r: 8};
+    P = await segueRapida(i0, p0);
+  } else if (RM){
+    // automatico: entre as trajetorias das deteções, a mais rapida (depois do lancamento vem o golpe)
+    est("Recherche du coup…");
+    let melhor = null, mv = 0;
+    for (let i = 0; i < NF; i++){
+      for (const d of RM[i].d){
+        if (d[4] < 0.25) continue;
+        const p0 = {x: d[0]*W, y: d[1]*H, r: Math.min(d[2]*W, d[3]*H)/2, w: d[2]*W, h: d[3]*H};
+        // so' comeca onde a bola ainda nao estava na imagem anterior (inicio de um movimento)
+        if (i > 0 && RM[i-1].d.some(e => Math.hypot(e[0]*W - p0.x, e[1]*H - p0.y) < 30 && e[4] > 0.15)) continue;
+        const Q = await segueRapida(i, p0); if (Q.length < 5) continue;
+        const dur = Q[Q.length - 1].t - Q[0].t, dist = Math.hypot(Q[Q.length - 1].x - Q[0].x, Q[Q.length - 1].y - Q[0].y), vel = dur > 0 ? dist/dur : 0;
+        if (vel > mv){ mv = vel; melhor = Q; }
+      }
+    }
+    P = melhor;
+  } else { MODO_COUP = true; est("Sans le PC, la recherche automatique du coup est trop lente : va à l'image juste après le coup et touche la balle."); return; }
+  if (!P || P.length < 4){ est("Coup non trouvé : utilise « Toucher la balle après le coup »."); return; }
+  // velocidade no inicio: x linear, y com a gravidade (nos primeiros pontos)
+  const ft = fatorT(), seg = P.slice(0, Math.min(P.length, 8)).map(p => ({...p, t: p.t*ft}));
+  const f = ajustaParab(seg); if (!f){ est("Trop peu de points pour la vitesse."); return; }
+  const vx = f.bx, vy = f.B, vpx = Math.hypot(vx, vy);
+  const diam = 2*[...P].map(p => p.r).sort((a, b) => a - b)[P.length >> 1];
+  const cmpx = (escala && escala !== "g") ? escala : 4/Math.max(3, diam);
+  const ms = vpx*cmpx/100;
+  traj = P.map(p => ({x: p.x, y: p.y, t: p.t, r: p.r})); soltura = traj[0]; topo = null; fase = 1; await vaiPara(P[0].t); texto(); desenha();
+  $("coupRes").hidden = false;
+  $("vVel").textContent = `${fmt(ms*3.6)} km/h`; $("tVel").textContent = `${fmt(ms, 1)} m/s · ${P.length} images`;
+  $("vRot").textContent = "—"; $("tRot").textContent = "";
+  est(`Vitesse dans le plan de la caméra (filmer de côté). Échelle : ${escala && escala !== "g" ? "repère" : "diamètre de la balle"}.`);
+  // efeito: so' no PC (precisa das imagens em resolucao total)
+  if (!RM || !RM.id){ $("tRot").textContent = "PC éteint : effet non mesuré"; return; }
+  $("tRot").textContent = "mesure sur le PC…";
+  try {
+    const r = await fetch(API_IA + "/rotacao", {method: "POST", headers: {"Content-Type": "application/json"}, signal: AbortSignal.timeout(60000),
+      body: JSON.stringify({id: RM.id, pontos: P.map(p => ({t: p.t, x: p.x/W, y: p.y/H, r: p.r/W}))})}).then(r => r.json());
+    if (!r.ok){ $("tRot").textContent = "ligne sur la balle non visible (balle marquée ? 240 i/s ?)"; return; }
+    const rpm = r.rpm/ft, lift = (r.sinal > 0) === (vx > 0);
+    $("vRot").textContent = `${Math.round(rpm/10)*10} tr/min`;
+    $("tRot").textContent = `${lift ? "lifté (topspin)" : "coupé (backspin)"} · ${fmt(rpm/60, 1)} tours/s` + (r.graus_por_imagem > 80 ? " · ⚠ trop rapide pour cette cadence : filme en 240 i/s" : "");
+  } catch(e){ $("tRot").textContent = "PC injoignable"; }
+}
 
 // ---- sessao (guardada no telemovel)
 const CLE = "pingvirtual.services";
