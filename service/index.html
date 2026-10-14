@@ -50,7 +50,7 @@ a{color:var(--table)}
     <div class="etapa">⚡ Mode direct : la caméra suit chaque lancer, feu <b style="color:var(--win)">vert</b> ou <b style="color:var(--loss)">rouge</b>, et enregistre la séance avec l'analyse à l'écran.</div>
     <div class="row"><button class="btn" id="dirAbre">Démarrer le mode direct</button>
       <select id="resol" aria-label="Résolution"><option value="1280x720">720p</option><option value="1920x1080" selected>1080p</option><option value="3840x2160">4K</option></select></div>
-    <p class="hint">Le navigateur limite la caméra (souvent 60 images/s). Pour le ralenti 240 images/s, filme avec l'appareil photo du téléphone en mode Ralenti et choisis la vidéo plus bas.</p>
+    <p class="hint">Dans le navigateur la caméra est limitée (souvent 60 images/s), ce qui suffit pour la règle du lancer. Pour 240 images/s (vitesse et effet), utilise « 📱 Caméra rapide » dans l'appli Android.</p>
   </div>
   <div id="dir" hidden style="position:fixed;inset:0;z-index:50;background:#000;display:flex;flex-direction:column">
     <div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center">
@@ -83,6 +83,7 @@ a{color:var(--table)}
       <p class="hint">Astuce : 2 à 3 secondes suffisent par service. Plus la vitesse (images/s) est haute, plus la mesure est précise.</p>
     </div>
     <span class="hint" id="info"></span>
+      <div class="hint" id="pcVideo" style="color:var(--ok, #3ecf8e)"></div>
   </div>
 
   <div id="trab" hidden>
@@ -170,6 +171,12 @@ async function enviaPC(f){
 let ARQV = null;
 function abreVideo(f){
   ARQV = f; PC_PROM = enviaPC(f);
+  const pe = $("pcVideo");
+  if (pe){
+    pe.textContent = PC_PROM && $("usaPC").checked ? "🖥️ Vidéo envoyée au PC (carte RTX) pour l'analyse…" : "";
+    const este = PC_PROM; PC_PROM.then(r => { if (PC_PROM !== este) return;
+      pe.textContent = r ? `🖥️ PC : analyse prête (${r.length} images) — appuie sur « 🔎 Détection automatique » ou « ⚡ Vitesse et effet »` : "🖥️ PC éteint ou injoignable : l'analyse se fera sur le téléphone"; });
+  }
   QUAD.forEach(q => q.bmp.close && q.bmp.close()); QUAD = []; idx = 0;
   v.src = URL.createObjectURL(f); $("info").textContent = "Chargement…";
   v.onloadedmetadata = async () => {
